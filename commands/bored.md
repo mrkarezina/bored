@@ -95,5 +95,5 @@ Before finishing, mentally verify:
 - Keep Canvas drawing code simple but charming — shapes and colors over complexity
 - Test your parallax layers mentally: do they tile seamlessly with `scrollX % spacing`?
 - Canvas is fixed at 800×400 — all coordinates are predictable
-- The game automatically connects to the leaderboard at `https://bored.run`
+- The game automatically connects to the leaderboard at `https://www.bored.run`
 - UI overlays (menu, game over, name input) are DOM-based with CSS — styled automatically from THEME.colors

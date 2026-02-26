@@ -24,11 +24,11 @@ Upload a local game HTML file so it's playable at a public URL.
 
 4. **Upload** — Run the following curl command:
    ```
-   curl -s -X POST https://bored.run/api/games/upload \
+   curl -s -X POST https://www.bored.run/api/games/upload \
      -H "Content-Type: application/json" \
      -d "$(jq -n --arg html "$(cat <filename>)" --arg gameId "<gameId>" '{gameId: $gameId, html: $html}')"
    ```
 
 5. **Report the result:**
-   - On success, tell the user: "Game shared! Play it at: **https://bored.run/play/<gameId>**"
+   - On success, tell the user: "Game shared! Play it at: **https://www.bored.run/play/<gameId>**"
    - On error, show the error message from the API response.

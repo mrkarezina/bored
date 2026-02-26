@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       console.error('Game upsert error:', gameError);
     }
 
-    const playUrl = `https://bored.run/play/${gameId}`;
+    const playUrl = `https://www.bored.run/play/${gameId}`;
 
     return NextResponse.json({ url: playUrl });
   } catch (e) {
