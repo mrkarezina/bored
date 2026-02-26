@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204 });
+}
+
 const MAX_HTML_SIZE = 500 * 1024; // 500KB
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
 const RATE_LIMIT_MAX = 10;

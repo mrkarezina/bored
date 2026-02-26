@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204 });
+}
+
 // Rate limit map: key = `playerName:gameId`, value = last submit timestamp
 const rateLimitMap = new Map<string, number>();
 
