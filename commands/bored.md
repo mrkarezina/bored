@@ -22,6 +22,10 @@ Also read:
 
 ## Step 2: Invent a Creative Theme
 
+If the user provided a game idea or description after `/bored`, use that as the basis for your theme. Interpret it creatively — the user might say "cats in space" and you turn that into "Cosmic Kittens" with astronaut cats dodging asteroids. Stay true to their idea but make it your own.
+
+If no idea was provided, invent one from scratch.
+
 Come up with a **fun, unexpected, specific** theme. The theme should make someone smile reading the title and want to play immediately.
 
 **Rules:**
