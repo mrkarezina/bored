@@ -154,13 +154,14 @@ export default async function GamePage({
           in Claude Code to generate your own unique game.
         </p>
         <div className="mt-4 pt-4 border-t border-neutral-800 flex items-center justify-center">
-          <code className="text-xs font-mono text-neutral-400">
-            /install-plugin{" "}
-            <span className="text-yellow-400">
-              https://github.com/mrkarezina/bored
-            </span>
+          <code className="text-xs font-mono text-neutral-400 text-left">
+            <span className="text-neutral-600">1.</span> /plugin marketplace add{" "}
+            <span className="text-yellow-400">mrkarezina/bored</span>
+            <br />
+            <span className="text-neutral-600">2.</span> /plugin install{" "}
+            <span className="text-yellow-400">bored@bored-games</span>
           </code>
-          <CopyButton text="/install-plugin https://github.com/mrkarezina/bored" />
+          <CopyButton text={"/plugin marketplace add mrkarezina/bored\n/plugin install bored@bored-games"} />
         </div>
       </div>
     </main>

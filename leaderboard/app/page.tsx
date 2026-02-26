@@ -72,13 +72,14 @@ export default async function Home() {
           in Claude Code to generate your own game
         </p>
         <div className="mt-6 inline-flex items-center bg-neutral-900 rounded-lg border border-neutral-800 px-4 py-3">
-          <code className="text-sm font-mono text-neutral-300">
-            /install-plugin{" "}
-            <span className="text-yellow-400">
-              https://github.com/mrkarezina/bored
-            </span>
+          <code className="text-sm font-mono text-neutral-300 text-left">
+            <span className="text-neutral-500">1.</span> /plugin marketplace add{" "}
+            <span className="text-yellow-400">mrkarezina/bored</span>
+            <br />
+            <span className="text-neutral-500">2.</span> /plugin install{" "}
+            <span className="text-yellow-400">bored@bored-games</span>
           </code>
-          <CopyButton text="/install-plugin https://github.com/mrkarezina/bored" />
+          <CopyButton text={"/plugin marketplace add mrkarezina/bored\n/plugin install bored@bored-games"} />
         </div>
       </div>
 

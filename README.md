@@ -26,7 +26,8 @@ Every game has a unique theme — "Neon Drift", "Kitchen Chaos", "Rooftop Run", 
 In Claude Code:
 
 ```
-/install-plugin https://github.com/mrkarezina/bored
+/plugin marketplace add mrkarezina/bored
+/plugin install bored@bored-games
 ```
 
 ## Usage
