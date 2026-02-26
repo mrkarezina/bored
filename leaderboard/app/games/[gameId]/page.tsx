@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CopyButton } from "../../copy-button";
 
 export const dynamic = "force-dynamic";
 
@@ -152,6 +153,15 @@ export default async function GamePage({
           </code>{" "}
           in Claude Code to generate your own unique game.
         </p>
+        <div className="mt-4 pt-4 border-t border-neutral-800 flex items-center justify-center">
+          <code className="text-xs font-mono text-neutral-400">
+            /install-plugin{" "}
+            <span className="text-yellow-400">
+              https://github.com/mrkarezina/bored
+            </span>
+          </code>
+          <CopyButton text="/install-plugin https://github.com/mrkarezina/bored" />
+        </div>
       </div>
     </main>
   );

@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import { CopyButton } from "./copy-button";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,15 @@ export default async function Home() {
           </code>{" "}
           in Claude Code to generate your own game
         </p>
+        <div className="mt-6 inline-flex items-center bg-neutral-900 rounded-lg border border-neutral-800 px-4 py-3">
+          <code className="text-sm font-mono text-neutral-300">
+            /install-plugin{" "}
+            <span className="text-yellow-400">
+              https://github.com/mrkarezina/bored
+            </span>
+          </code>
+          <CopyButton text="/install-plugin https://github.com/mrkarezina/bored" />
+        </div>
       </div>
 
       <div className="grid md:grid-cols-5 gap-8">
