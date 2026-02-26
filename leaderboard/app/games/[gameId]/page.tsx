@@ -1,21 +1,15 @@
 import { supabase } from "@/lib/supabase";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CopyButton } from "../../copy-button";
 
 export const dynamic = "force-dynamic";
-
-interface ScoreRow {
-  player_name: string;
-  score: number;
-  created_at: string;
-}
 
 interface GameRow {
   id: string;
   name: string;
   theme_description: string | null;
   play_count: number;
+  all_time_high: number;
   created_at: string;
 }
 
@@ -26,16 +20,6 @@ async function getGame(gameId: string) {
     .eq("id", gameId)
     .single();
   return data as unknown as GameRow | null;
-}
-
-async function getScores(gameId: string) {
-  const { data } = await supabase
-    .from("scores")
-    .select("player_name, score, created_at")
-    .eq("game_id", gameId)
-    .order("score", { ascending: false })
-    .limit(50);
-  return (data as unknown as ScoreRow[]) || [];
 }
 
 function formatTimeAgo(dateStr: string) {
@@ -55,10 +39,7 @@ export default async function GamePage({
   params: Promise<{ gameId: string }>;
 }) {
   const { gameId } = await params;
-  const [game, scores] = await Promise.all([
-    getGame(gameId),
-    getScores(gameId),
-  ]);
+  const game = await getGame(gameId);
 
   if (!game) {
     notFound();
@@ -66,13 +47,6 @@ export default async function GamePage({
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
-      <Link
-        href="/"
-        className="text-sm text-neutral-500 hover:text-neutral-300 font-mono mb-6 inline-block transition-colors"
-      >
-        &larr; back to all games
-      </Link>
-
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-yellow-400 to-pink-500 bg-clip-text text-transparent">
           {game.name}
@@ -82,70 +56,29 @@ export default async function GamePage({
             {game.theme_description}
           </p>
         )}
-        <div className="flex gap-4 mt-3 text-xs text-neutral-600 font-mono">
-          <span>{game.play_count || 0} plays</span>
-          <span>created {formatTimeAgo(game.created_at)}</span>
+        <div className="text-xs text-neutral-600 font-mono mt-3">
+          created {formatTimeAgo(game.created_at)}
         </div>
       </div>
 
-      <h2 className="text-xl font-bold mb-4 font-mono text-yellow-400">
-        Leaderboard
-      </h2>
-
-      <div className="bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden">
-        <table className="w-full text-sm font-mono">
-          <thead>
-            <tr className="text-neutral-500 border-b border-neutral-800">
-              <th className="text-left py-3 px-4 w-12">#</th>
-              <th className="text-left py-3 px-2">Player</th>
-              <th className="text-right py-3 px-2">Score</th>
-              <th className="text-right py-3 px-4">When</th>
-            </tr>
-          </thead>
-          <tbody>
-            {scores.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={4}
-                  className="py-8 text-center text-neutral-600"
-                >
-                  No scores yet. Play the game and be the first!
-                </td>
-              </tr>
-            ) : (
-              scores.map((s, i) => (
-                <tr
-                  key={`${s.player_name}-${s.score}-${i}`}
-                  className="border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors"
-                >
-                  <td className="py-3 px-4 text-neutral-500">
-                    {i === 0 ? (
-                      <span className="text-yellow-400">1</span>
-                    ) : i === 1 ? (
-                      <span className="text-neutral-300">2</span>
-                    ) : i === 2 ? (
-                      <span className="text-orange-400">3</span>
-                    ) : (
-                      i + 1
-                    )}
-                  </td>
-                  <td className="py-3 px-2 text-white font-medium">
-                    {s.player_name}
-                  </td>
-                  <td className="py-3 px-2 text-right text-yellow-400 font-bold">
-                    {s.score.toLocaleString()}
-                  </td>
-                  <td className="py-3 px-4 text-right text-neutral-500">
-                    {formatTimeAgo(s.created_at)}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="bg-neutral-900 rounded-lg border border-neutral-800 p-6 text-center">
+          <div className="text-3xl font-bold font-mono text-pink-400">
+            {(game.play_count || 0).toLocaleString()}
+          </div>
+          <div className="text-sm text-neutral-500 font-mono mt-1">plays</div>
+        </div>
+        <div className="bg-neutral-900 rounded-lg border border-neutral-800 p-6 text-center">
+          <div className="text-3xl font-bold font-mono text-yellow-400">
+            {(game.all_time_high || 0).toLocaleString()}
+          </div>
+          <div className="text-sm text-neutral-500 font-mono mt-1">
+            all-time high
+          </div>
+        </div>
       </div>
 
-      <div className="mt-8 p-4 bg-neutral-900 rounded-lg border border-neutral-800 text-center">
+      <div className="p-4 bg-neutral-900 rounded-lg border border-neutral-800 text-center">
         <p className="text-sm text-neutral-400 font-mono">
           Want to play? Run{" "}
           <code className="bg-neutral-800 px-2 py-0.5 rounded text-yellow-400">
@@ -153,15 +86,21 @@ export default async function GamePage({
           </code>{" "}
           in Claude Code to generate your own unique game.
         </p>
-        <div className="mt-4 pt-4 border-t border-neutral-800 flex items-center justify-center">
-          <code className="text-xs font-mono text-neutral-400 text-left">
-            <span className="text-neutral-600">1.</span> /plugin marketplace add{" "}
-            <span className="text-yellow-400">mrkarezina/bored</span>
-            <br />
-            <span className="text-neutral-600">2.</span> /plugin install{" "}
-            <span className="text-yellow-400">bored@bored-games</span>
-          </code>
-          <CopyButton text={"/plugin marketplace add mrkarezina/bored\n/plugin install bored@bored-games"} />
+        <div className="mt-4 pt-4 border-t border-neutral-800 flex flex-col gap-2 max-w-sm mx-auto w-full">
+          <div className="flex items-center justify-between bg-neutral-950 rounded-lg border border-neutral-800 px-3 py-2">
+            <code className="text-xs font-mono text-neutral-400">
+              /plugin marketplace add{" "}
+              <span className="text-yellow-400">mrkarezina/bored</span>
+            </code>
+            <CopyButton text="/plugin marketplace add mrkarezina/bored" />
+          </div>
+          <div className="flex items-center justify-between bg-neutral-950 rounded-lg border border-neutral-800 px-3 py-2">
+            <code className="text-xs font-mono text-neutral-400">
+              /plugin install{" "}
+              <span className="text-yellow-400">bored@bored-games</span>
+            </code>
+            <CopyButton text="/plugin install bored@bored-games" />
+          </div>
         </div>
       </div>
     </main>
