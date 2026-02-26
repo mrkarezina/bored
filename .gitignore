@@ -3,3 +3,7 @@ node_modules/
 .env
 .env.local
 .DS_Store
+*.tsbuildinfo
+
+# Supabase CLI local state
+**/supabase/.temp/

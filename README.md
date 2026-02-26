@@ -6,27 +6,15 @@ Every game is a self-contained `index.html` — no dependencies, no build step, 
 
 Try games made with /bored at **[bored.run](https://bored.run)**
 
-## What You Get
-
-Type `/bored` and Claude creates a complete game with:
-
-- **Canvas 2D graphics** — character, obstacles, parallax backgrounds, all drawn with code
-- **Physics** — variable-height jumps, double jump, ducking, fixed-timestep simulation
-- **Power-ups** — shield, invincibility, 2x score, slow-mo, magnet — with a combo multiplier system
-- **Procedural audio** — jump chirps, death sounds, collect jingles, and background music — all synthesized with Web Audio API
-- **Particles** — dust, rings, explosions, sparkles, confetti, speed lines — object-pooled for zero GC
-- **Game juice** — screen shake, squash & stretch, hit freeze, near-miss detection, floating text
-- **Global leaderboard** — scores submit to [bored.run](https://bored.run) automatically
-- **Polished UI** — CSS menu overlay with backdrop blur, game-over screen with animated leaderboard, HTML name input
-
-Every game has a unique theme — "Neon Drift", "Kitchen Chaos", "Rooftop Run", "Cosmic Surfer" — with matching visuals, sounds, and obstacles.
-
 ## Install
 
 In Claude Code:
 
 ```
 /plugin marketplace add mrkarezina/bored
+```
+
+```
 /plugin install bored@bored-games
 ```
 
@@ -40,7 +28,54 @@ Just type:
 
 Claude invents a theme, draws all the sprites, writes the sounds, and outputs a single `index.html` file. Then opens it in your browser.
 
-That's it. Play the game, share the file, challenge your friends on the leaderboard.
+### Request a specific theme
+
+Pass a description after the command to guide the theme:
+
+```
+/bored cats in space
+```
+
+```
+/bored underwater pirate adventure
+```
+
+Claude interprets your idea creatively — "cats in space" might become "Cosmic Kittens" with astronaut cats dodging asteroids.
+
+### Default behavior
+
+With no description, Claude invents a theme from scratch — something fun and unexpected like "Kitchen Chaos", "Neon Drift", or "Rooftop Run".
+
+## What You Get
+
+Every generated game includes:
+
+- **Canvas 2D graphics** — character, obstacles, parallax backgrounds, all drawn with code
+- **Physics** — variable-height jumps, double jump, ducking, fixed-timestep simulation
+- **Power-ups** — shield, invincibility, 2x score, slow-mo, magnet — with a combo multiplier system
+- **Procedural audio** — jump chirps, death sounds, collect jingles, and background music — all synthesized with Web Audio API
+- **Particles** — dust, rings, explosions, sparkles, confetti, speed lines — object-pooled for zero GC
+- **Game juice** — screen shake, squash & stretch, hit freeze, near-miss detection, floating text
+- **Score tracking** — play count and all-time high tracked at [bored.run](https://bored.run)
+- **Polished UI** — CSS menu overlay with backdrop blur, game-over screen with stats
+
+Every game has a unique theme with matching visuals, sounds, and obstacles.
+
+## Sharing
+
+After generating a game, share it with anyone:
+
+```
+/bored-share
+```
+
+This uploads your game to [bored.run](https://bored.run) and gives you a link like:
+
+```
+https://www.bored.run/play/<gameId>
+```
+
+Playable in any browser — no install needed. Send the link to friends and compete for the all-time high.
 
 ## How It Works
 
@@ -51,12 +86,6 @@ The plugin has two parts:
 2. **THEME object** — the only part that changes per game. Contains all the visuals (`draw()` functions using Canvas 2D), obstacle definitions, power-up configs, parallax layers, color palette, difficulty curve, and sound settings. Claude fills this in based on the theme it invents.
 
 The engine handles physics, rendering, particles, audio, input, scoring, combos, and leaderboard integration. Claude only needs to be creative with the THEME.
-
-## Leaderboard
-
-Every generated game connects to [bored.run](https://bored.run) for global score tracking. Players enter their name once (saved in localStorage), and scores are submitted automatically on game over. The game-over screen shows the top 10 scores for that specific game.
-
-Each game gets a unique UUID, so every `/bored` invocation creates its own leaderboard.
 
 ## Reference Docs
 
