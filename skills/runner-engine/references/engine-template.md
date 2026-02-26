@@ -138,42 +138,38 @@ The generated file must be a single, self-contained `index.html` with no externa
     animation: pulse 1s ease-in-out infinite;
     margin-bottom: 8px;
   }
-  /* Leaderboard */
-  #leaderboard-container {
+  /* Game Stats */
+  #game-stats {
     width: 85%;
     max-width: 350px;
     margin: 8px 0;
-  }
-  #leaderboard-title {
-    font-size: 0.9em;
-    opacity: 0.6;
-    text-align: center;
-    margin-bottom: 8px;
-  }
-  #leaderboard-list {
-    list-style: none;
-    width: 100%;
-  }
-  #leaderboard-list li {
     display: flex;
-    justify-content: space-between;
-    padding: 4px 8px;
-    font-size: 0.85em;
-    border-radius: 4px;
+    justify-content: space-around;
+    text-align: center;
+  }
+  .stat-item {
     opacity: 0;
     animation: fadeSlideIn 0.3s ease forwards;
   }
-  #leaderboard-list li:nth-child(1) { color: #ffd700; }
-  #leaderboard-list li:nth-child(2) { color: #c0c0c0; }
-  #leaderboard-list li:nth-child(3) { color: #cd7f32; }
-  .lb-rank { min-width: 24px; opacity: 0.5; }
-  .lb-name { flex: 1; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; }
-  .lb-score { font-weight: 700; font-variant-numeric: tabular-nums; }
-  #leaderboard-loading {
-    text-align: center;
-    opacity: 0.4;
-    font-size: 0.85em;
-    padding: 12px;
+  .stat-value {
+    font-size: 1.4em;
+    font-weight: 800;
+    color: var(--color-score);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-label {
+    font-size: 0.75em;
+    opacity: 0.5;
+    margin-top: 2px;
+  }
+  #gameover-world-record {
+    display: none;
+    font-size: 1.1em;
+    color: var(--color-score);
+    font-weight: 700;
+    animation: pulse 1s ease-in-out infinite;
+    margin-bottom: 8px;
+    text-shadow: 0 0 10px var(--color-score);
   }
   #gameover-restart {
     font-size: 0.9em;
@@ -185,47 +181,6 @@ The generated file must be a single, self-contained `index.html` with no externa
   @keyframes fadeSlideIn {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
-  }
-  /* Name input modal */
-  #name-modal {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.8);
-    z-index: 100;
-    align-items: center;
-    justify-content: center;
-  }
-  #name-modal.show { display: flex; }
-  #name-form {
-    background: rgba(30,30,60,0.95);
-    padding: 24px 32px;
-    border-radius: 12px;
-    text-align: center;
-    border: 1px solid rgba(255,255,255,0.1);
-  }
-  #name-form input {
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    color: white;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-size: 1.1em;
-    text-align: center;
-    outline: none;
-    width: 200px;
-    margin: 12px 0;
-  }
-  #name-form input:focus { border-color: var(--color-accent); }
-  #name-form button {
-    background: var(--color-accent);
-    color: white;
-    border: none;
-    padding: 8px 24px;
-    border-radius: 6px;
-    font-size: 1em;
-    cursor: pointer;
-    font-weight: 600;
   }
   #game-footer {
     font-size: 0.7em;
@@ -254,27 +209,14 @@ The generated file must be a single, self-contained `index.html` with no externa
       <div id="gameover-title">Game Over</div>
       <div id="gameover-score">0</div>
       <div id="gameover-newrecord">NEW RECORD!</div>
+      <div id="gameover-world-record">NEW WORLD RECORD!</div>
       <div id="gameover-highscore">Best: 0</div>
-      <div id="leaderboard-container">
-        <div id="leaderboard-title">Global Leaderboard</div>
-        <div id="leaderboard-loading">Loading scores...</div>
-        <ul id="leaderboard-list"></ul>
-      </div>
+      <div id="game-stats"></div>
       <div id="gameover-restart">Press SPACE or tap to play again</div>
     </div>
   </div>
 
   <div id="game-footer">Made with /bored</div>
-
-  <!-- Name Input Modal -->
-  <div id="name-modal">
-    <div id="name-form">
-      <div>Pick a name for the leaderboard</div>
-      <input id="name-input" type="text" maxlength="20" placeholder="Your name" autofocus>
-      <br>
-      <button id="name-submit">Let's go!</button>
-    </div>
-  </div>
 
 <script>
 // ============================================================
@@ -401,7 +343,7 @@ const THEME = {
 // ENGINE — DO NOT MODIFY BELOW THIS LINE
 // ============================================================
 
-const LEADERBOARD_URL = 'https://bored.run';
+const LEADERBOARD_URL = 'https://www.bored.run';
 
 // --- AudioEngine IIFE ---
 const AudioEngine = (() => {
@@ -949,58 +891,25 @@ const HUD = (() => {
 
 // --- ScoreboardClient IIFE ---
 const ScoreboardClient = (() => {
-  let playerName = localStorage.getItem('bored-player-name') || '';
-
-  function ensurePlayerName() {
-    if (playerName) return Promise.resolve(playerName);
-    return new Promise((resolve) => {
-      const modal = document.getElementById('name-modal');
-      const input = document.getElementById('name-input');
-      const btn = document.getElementById('name-submit');
-      if (!modal || !input || !btn) { playerName = 'Anon'; resolve(playerName); return; }
-      modal.classList.add('show');
-      input.value = '';
-      input.focus();
-      function submit() {
-        const name = (input.value || 'Anon').trim().slice(0, 20);
-        playerName = name || 'Anon';
-        localStorage.setItem('bored-player-name', playerName);
-        modal.classList.remove('show');
-        btn.removeEventListener('click', submit);
-        input.removeEventListener('keydown', onKey);
-        resolve(playerName);
-      }
-      function onKey(e) { if (e.key === 'Enter') submit(); }
-      btn.addEventListener('click', submit);
-      input.addEventListener('keydown', onKey);
-    });
-  }
-
   async function submitScore(gameId, gameName, description, finalScore) {
     try {
-      const name = await ensurePlayerName();
       const res = await fetch(`${LEADERBOARD_URL}/api/scores`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameId, gameName, theme: description,
-          playerName: name, score: Math.floor(finalScore),
-        }),
+        body: JSON.stringify({ gameId, gameName, theme: description, score: Math.floor(finalScore) }),
       });
       if (res.ok) return await res.json();
       return null;
     } catch(e) { return null; }
   }
-
-  async function getLeaderboard(gameId, limit) {
+  async function getStats(gameId) {
     try {
-      const res = await fetch(`${LEADERBOARD_URL}/api/scores?gameId=${gameId}&limit=${limit || 10}`);
+      const res = await fetch(`${LEADERBOARD_URL}/api/scores?gameId=${gameId}`);
       if (res.ok) return await res.json();
-      return [];
-    } catch(e) { return []; }
+      return null;
+    } catch(e) { return null; }
   }
-
-  return { ensurePlayerName, submitScore, getLeaderboard };
+  return { submitScore, getStats };
 })();
 
 // --- ScoreboardUI IIFE ---
@@ -1009,13 +918,13 @@ const ScoreboardUI = (() => {
 
   function init(themeConfig) { theme = themeConfig; }
 
-  async function showGameOver(score, highScore, gameId) {
+  function showGameOver(score, highScore, apiResult) {
     const screen = document.getElementById('gameover-screen');
     const scoreEl = document.getElementById('gameover-score');
     const hsEl = document.getElementById('gameover-highscore');
     const newRecordEl = document.getElementById('gameover-newrecord');
-    const listEl = document.getElementById('leaderboard-list');
-    const loadingEl = document.getElementById('leaderboard-loading');
+    const worldRecordEl = document.getElementById('gameover-world-record');
+    const statsEl = document.getElementById('game-stats');
     if (!screen) return;
 
     screen.classList.remove('hidden');
@@ -1034,56 +943,38 @@ const ScoreboardUI = (() => {
     }
 
     if (hsEl) hsEl.textContent = 'Best: ' + Math.floor(highScore).toLocaleString();
-    if (newRecordEl) newRecordEl.style.display = score >= highScore && score > 0 ? 'block' : 'none';
 
-    // Fetch leaderboard
-    if (listEl) listEl.innerHTML = '';
-    if (loadingEl) loadingEl.style.display = 'block';
-    try {
-      const entries = await ScoreboardClient.getLeaderboard(gameId, 10);
-      renderLeaderboard(entries);
-    } catch(e) {
-      if (loadingEl) loadingEl.textContent = 'Could not load leaderboard';
+    const isPersonalBest = score >= highScore && score > 0;
+    const isWorldRecord = apiResult && apiResult.isNewRecord;
+
+    if (newRecordEl) newRecordEl.style.display = isPersonalBest && !isWorldRecord ? 'block' : 'none';
+    if (worldRecordEl) worldRecordEl.style.display = isWorldRecord ? 'block' : 'none';
+
+    // Show game stats
+    if (statsEl && apiResult) {
+      statsEl.innerHTML = '';
+      const items = [
+        { value: (apiResult.allTimeHigh || 0).toLocaleString(), label: 'All-Time High' },
+        { value: (apiResult.playCount || 0).toLocaleString(), label: 'Total Plays' },
+      ];
+      items.forEach((item, i) => {
+        const div = document.createElement('div');
+        div.className = 'stat-item';
+        div.style.animationDelay = (i * 100) + 'ms';
+        const val = document.createElement('div');
+        val.className = 'stat-value';
+        val.textContent = item.value;
+        const lbl = document.createElement('div');
+        lbl.className = 'stat-label';
+        lbl.textContent = item.label;
+        div.appendChild(val);
+        div.appendChild(lbl);
+        statsEl.appendChild(div);
+      });
     }
   }
 
-  function renderLeaderboard(entries) {
-    const listEl = document.getElementById('leaderboard-list');
-    const loadingEl = document.getElementById('leaderboard-loading');
-    if (loadingEl) loadingEl.style.display = 'none';
-    if (!listEl) return;
-    listEl.innerHTML = '';
-
-    if (!entries || entries.length === 0) {
-      const li = document.createElement('li');
-      li.style.textAlign = 'center';
-      li.style.opacity = '0.5';
-      li.textContent = 'No scores yet — be the first!';
-      listEl.appendChild(li);
-      return;
-    }
-
-    const list = Array.isArray(entries) ? entries : (entries.scores || []);
-    list.forEach((entry, i) => {
-      const li = document.createElement('li');
-      li.style.animationDelay = (i * 60) + 'ms';
-      const rank = document.createElement('span');
-      rank.className = 'lb-rank';
-      rank.textContent = '#' + (i + 1);
-      const name = document.createElement('span');
-      name.className = 'lb-name';
-      name.textContent = entry.playerName || entry.player_name || 'Anon';
-      const sc = document.createElement('span');
-      sc.className = 'lb-score';
-      sc.textContent = (entry.score || 0).toLocaleString();
-      li.appendChild(rank);
-      li.appendChild(name);
-      li.appendChild(sc);
-      listEl.appendChild(li);
-    });
-  }
-
-  return { init, showGameOver, renderLeaderboard };
+  return { init, showGameOver };
 })();
 
 // --- Speed Lines ---
@@ -1360,8 +1251,8 @@ const RunnerEngine = (() => {
   function goToGameOver() {
     state = 'gameover';
     // Submit score + show UI
-    ScoreboardClient.submitScore(THEME.gameId, THEME.name, THEME.description, score).then(() => {
-      ScoreboardUI.showGameOver(score, highScore, THEME.gameId);
+    ScoreboardClient.submitScore(THEME.gameId, THEME.name, THEME.description, score).then((result) => {
+      ScoreboardUI.showGameOver(score, highScore, result);
     });
   }
 
@@ -1808,7 +1699,7 @@ RunnerEngine.start();
 
 ## Key Engine Features Summary
 
-1. **HTML/CSS UI shell** — DOM-based menu, game-over, and name-input screens with backdrop-filter blur and CSS transitions
+1. **HTML/CSS UI shell** — DOM-based menu and game-over screens with backdrop-filter blur and CSS transitions
 2. **Fixed 800x400 canvas** with CSS scaling — predictable coordinates for drawing
 3. **Modular IIFEs** — AudioEngine, ParticleEngine, InputHandler, HUD, ScoreboardClient, ScoreboardUI, SpeedLines, FloatingText, RunnerEngine — all in one file
 4. **Fixed-timestep physics** at 120Hz with variable rendering — consistent behavior regardless of frame rate
@@ -1823,6 +1714,6 @@ RunnerEngine.start();
 13. **Beat-scheduled music**: Lookahead pattern at 25ms intervals for gapless playback, or simple default beat
 14. **Modular HUD**: Zero-padded score, high score, combo multiplier, active effect timers with progress bars, elapsed time
 15. **Game juice**: screen shake, squash/stretch, hit freeze, speed lines, near-miss detection, floating text
-16. **Leaderboard integration**: HTML name-input modal (ask once, persists in localStorage), fetches/renders leaderboard on game over via Next.js API proxy
+16. **Anonymous play tracking**: Submits score on game over, shows all-time high + play count via Next.js API proxy
 17. **Full input support**: keyboard (Space/Up/W = jump, Down/S = duck), touch (tap = jump, swipe down = duck), mouse
 18. **Mobile-ready**: CSS scaling, touch-action none, user-scalable no
