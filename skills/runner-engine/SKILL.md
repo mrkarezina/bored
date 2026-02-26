@@ -15,8 +15,10 @@ This skill provides context about the /bored endless runner game engine. Use it 
 ## Architecture
 
 Each game is a single self-contained HTML file with:
-- A `THEME` object (the only customized part) containing all visuals, sounds, and theme data
-- A shared engine handling physics, rendering, particles, audio, input, and leaderboard
+- A `THEME` object (the only customized part) containing all visuals, sounds, and config
+- Modular IIFE engine components: AudioEngine, ParticleEngine, InputHandler, HUD, ScoreboardClient, ScoreboardUI, SpeedLines, FloatingText, RunnerEngine
+- DOM-based UI overlays (menu, game over, name input) styled with CSS
+- Fixed 800×400 canvas with CSS responsive scaling
 
 ## Key Reference Files
 
@@ -29,24 +31,32 @@ Each game is a single self-contained HTML file with:
 - Fixed-timestep physics (120Hz) with variable rendering
 - State machine: menu → playing → dying → gameover
 - Variable-height jumps (hold=float, release=fast fall) + double jump
-- Object-pooled particles (300 pre-allocated, zero GC)
+- Ducking mechanic (Down/S key, swipe-down on mobile) — duck under air obstacles
+- Power-up system with 5 effect types: shield, invincible, 2x-score, slow-mo, magnet
+- Combo system: consecutive pickups increase multiplier (1x → 5x max) with flash text
+- Weighted obstacle spawning (no score-threshold unlocking)
+- Object-pooled particles (300 pre-allocated, zero GC) — dust, ring, death, sparkle, confetti, trail
 - Procedural Web Audio API sounds + beat-scheduled music
+- Modular HUD: zero-padded score, high score, combo, effect timers, elapsed time
 - Screen shake, squash/stretch, hit freeze, speed lines, near-miss detection
-- Difficulty ramp: 300→900 px/s, tightening obstacle intervals
-- Forgiving hitboxes (80% of visual size)
-- Leaderboard integration (score submission to backend API)
-- Full input support: keyboard, touch, mouse
+- Difficulty ramp: configurable speed and spawn intervals
+- Forgiving hitboxes (4px padding on each side)
+- DOM-based UI: menu overlay with backdrop blur, game-over with leaderboard, HTML name input
+- Full input support: keyboard (Space/Up/W = jump, Down/S = duck), touch (tap/swipe), mouse
 
 ## Leaderboard
 
-- Backend: Next.js + Supabase at `https://bored-leaderboard.vercel.app`
+- Backend: Next.js + Supabase at `https://bored.run`
 - Each game gets a unique UUID v4 `gameId`
-- Scores are submitted via POST to `/api/scores`
-- Global leaderboard at the website root, per-game leaderboards at `/games/[gameId]`
+- Scores submitted via POST to `/api/scores`
+- Leaderboard fetched and rendered inline on game-over screen
+- Player name asked once via HTML modal, persisted in localStorage
+- High score persisted per gameId in localStorage
 
 ## Common Issues
 
-- **No sound on mobile**: Audio requires user gesture — the engine handles this via `initAudio()` on first input
+- **No sound on mobile**: Audio requires user gesture — the engine handles this via `AudioEngine.ensure()` on first input
 - **Parallax tearing**: Ensure layers use `-(scrollX % spacing)` for seamless tiling
-- **Empty sound functions**: Every sound in `THEME.sounds` must create and start oscillators — empty functions produce silence
+- **Power-ups not spawning**: Check `spawnChance` is set (0.001-0.005 range) and `powerups` array is populated
+- **Air obstacles too easy/hard**: Adjust `duckHeight` in player config and air obstacle dimensions
 - **Score not submitting**: Check that `THEME.gameId` is a valid UUID and `LEADERBOARD_URL` is correct

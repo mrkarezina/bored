@@ -4,6 +4,32 @@ Ready-to-use Web Audio API sound recipes for the game engine. Each recipe is a f
 
 All sounds are short, procedural, and use only built-in Web Audio API nodes — no samples or external files needed.
 
+## How Sounds Work in the Engine
+
+The AudioEngine has built-in default sounds tuned via simple config values:
+
+```js
+sounds: {
+  jumpFreqs: [200, 500],          // Ascending sweep for jump
+  collectFreqs: [523, 659, 784],  // Three-note arpeggio for collect
+  hitFreq: 80,                    // Low frequency for death
+  bgBPM: 120,                    // Background beat tempo
+}
+```
+
+For more control, provide **full custom sound functions** that override the defaults. Each receives `(audioCtx, masterGain)` and should create+start oscillators/noise:
+
+```js
+sounds: {
+  jump(ac, g) { /* custom jump sound */ },
+  die(ac, g) { /* custom death sound */ },
+  playBeat(ac, g, beatNum, time) { /* custom music */ },
+  // ... etc
+}
+```
+
+---
+
 ## Helper: Create Noise Buffer
 
 Some recipes need a noise source. Create one like this:
@@ -91,6 +117,62 @@ die(ac, g) {
   v.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.5);
   o.connect(v).connect(g);
   o.start(); o.stop(ac.currentTime + 0.5);
+}
+```
+
+## Collect — Power-up Pickup
+
+Bright three-note ascending arpeggio:
+
+```js
+collect(ac, g) {
+  [523, 659, 784].forEach((freq, i) => {
+    const o = ac.createOscillator();
+    const v = ac.createGain();
+    o.type = 'sine';
+    o.frequency.value = freq;
+    v.gain.setValueAtTime(0.001, ac.currentTime + i * 0.06);
+    v.gain.linearRampToValueAtTime(0.12, ac.currentTime + i * 0.06 + 0.01);
+    v.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.06 + 0.15);
+    o.connect(v).connect(g);
+    o.start(ac.currentTime + i * 0.06);
+    o.stop(ac.currentTime + i * 0.06 + 0.15);
+  });
+}
+```
+
+**Variation — Sparkle collect** (higher, more magical):
+
+```js
+collect(ac, g) {
+  [880, 1108, 1318].forEach((freq, i) => {
+    const o = ac.createOscillator();
+    const v = ac.createGain();
+    o.type = 'sine';
+    o.frequency.value = freq;
+    v.gain.setValueAtTime(0.001, ac.currentTime + i * 0.05);
+    v.gain.linearRampToValueAtTime(0.1, ac.currentTime + i * 0.05 + 0.01);
+    v.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.05 + 0.12);
+    o.connect(v).connect(g);
+    o.start(ac.currentTime + i * 0.05);
+    o.stop(ac.currentTime + i * 0.05 + 0.12);
+  });
+}
+```
+
+**Variation — Retro coin** (short bleep):
+
+```js
+collect(ac, g) {
+  const o = ac.createOscillator();
+  const v = ac.createGain();
+  o.type = 'square';
+  o.frequency.setValueAtTime(988, ac.currentTime);
+  o.frequency.setValueAtTime(1318, ac.currentTime + 0.06);
+  v.gain.setValueAtTime(0.12, ac.currentTime);
+  v.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15);
+  o.connect(v).connect(g);
+  o.start(); o.stop(ac.currentTime + 0.15);
 }
 ```
 
@@ -186,7 +268,7 @@ milestone(ac, g) {
 ### Simple Kick + Hi-Hat Pattern
 
 ```js
-bpm: 120,
+bgBPM: 120,
 playBeat(ac, g, beatNum, time) {
   // Kick on beats 0, 4, 8, 12 (every bar)
   if (beatNum % 4 === 0) {
@@ -222,7 +304,7 @@ playBeat(ac, g, beatNum, time) {
 ### Kick + Snare + Hi-Hat with Bass
 
 ```js
-bpm: 130,
+bgBPM: 130,
 playBeat(ac, g, beatNum, time) {
   const bar = beatNum % 8;
 
@@ -292,3 +374,4 @@ playBeat(ac, g, beatNum, time) {
 - For variety, add slight randomness to frequency or gain values
 - Triangle waves are softer, square waves are buzzy/retro, sawtooth is harsh/aggressive, sine is pure
 - Shorter durations (0.05-0.15s) for UI sounds, longer (0.3-0.5s) for death/milestone
+- You can provide simple config values (`jumpFreqs`, `collectFreqs`, etc.) for quick tuning, or full custom functions for complete control
