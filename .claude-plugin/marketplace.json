@@ -1,0 +1,13 @@
+{
+  "name": "bored-games",
+  "owner": {
+    "name": "Marko Arezina"
+  },
+  "plugins": [
+    {
+      "name": "bored",
+      "source": "./",
+      "description": "Generate unique endless runner games with /bored"
+    }
+  ]
+}

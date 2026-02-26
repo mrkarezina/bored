@@ -1,18 +1,5 @@
 {
   "name": "bored",
   "version": "1.0.0",
-  "description": "Generate unique endless runner games with a single command",
-  "commands": [
-    {
-      "name": "bored",
-      "description": "Generate a unique, fun endless runner game",
-      "entry": "../commands/bored.md"
-    }
-  ],
-  "skills": [
-    {
-      "name": "runner-engine",
-      "entry": "../skills/runner-engine/SKILL.md"
-    }
-  ]
+  "description": "Generate unique endless runner games with a single command"
 }
