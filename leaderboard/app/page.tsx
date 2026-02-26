@@ -73,7 +73,29 @@ export default async function Home() {
 
       {/* Footer */}
       <div className="text-center mt-16 text-sm text-neutral-700 font-mono">
-        Built with /bored — a Claude Code plugin
+        Built with{" "}
+        <a
+          href="https://github.com/mrkarezina/bored"
+          className="hover:text-neutral-400 transition-colors underline underline-offset-2"
+        >
+          /bored
+        </a>
+        {" "}— a Claude Code plugin
+      </div>
+      <div className="flex justify-center gap-4 mt-4 text-xs font-mono">
+        <a
+          href="https://www.bored.run/play/a3c7e5f1-d8b2-4a96-bf40-6e9d1c3a5b82"
+          className="text-neutral-600 hover:text-pink-400 transition-colors"
+        >
+          Jungle Boogie
+        </a>
+        <span className="text-neutral-800">·</span>
+        <a
+          href="https://www.bored.run/play/f8e2d1c0-b9a8-4765-9f3e-2d1c0b9a8765"
+          className="text-neutral-600 hover:text-pink-400 transition-colors"
+        >
+          Cupids Rush
+        </a>
       </div>
     </main>
   );

@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "/bored leaderboard",
-  description: "Global leaderboard for /bored endless runner games",
+  title: "/bored",
+  description: "Endless runner generator — a Claude Code plugin",
 };
 
 export default function RootLayout({
