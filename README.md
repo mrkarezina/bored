@@ -23,27 +23,10 @@ Every game has a unique theme — "Neon Drift", "Kitchen Chaos", "Rooftop Run", 
 
 ## Install
 
-### From the marketplace
-
 In Claude Code:
 
 ```
-/plugin marketplace add mrkarezina/bored
-```
-
-Then install the plugin:
-
-```
-/plugin install bored@bored-games
-```
-
-### Manual
-
-Clone the repo and point Claude Code at it:
-
-```bash
-git clone https://github.com/mrkarezina/bored.git
-claude --plugin-dir ./bored
+/install-plugin https://github.com/mrkarezina/bored
 ```
 
 ## Usage
