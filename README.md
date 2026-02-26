@@ -92,4 +92,3 @@ The engine handles physics, rendering, particles, audio, input, scoring, combos,
 - [`skills/runner-engine/references/engine-template.md`](skills/runner-engine/references/engine-template.md) — Complete engine code
 - [`skills/runner-engine/references/theming-guide.md`](skills/runner-engine/references/theming-guide.md) — THEME object API reference
 - [`skills/runner-engine/references/audio-cookbook.md`](skills/runner-engine/references/audio-cookbook.md) — Procedural sound recipes
-- [`examples/sample-game.html`](examples/sample-game.html) — Sample game (Neon Drift theme)
