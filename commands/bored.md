@@ -76,13 +76,27 @@ Run `open index.html` to launch the game in the default browser.
 ## Quality Checklist
 
 Before finishing, mentally verify:
+
+**Visual clarity (prevents flickering and unreadable objects):**
+- [ ] Obstacles use angular/pointed shapes with warm colors (reds, oranges)
+- [ ] Power-ups use rounded shapes with cool/bright colors (blues, greens, golds)
+- [ ] Every obstacle and power-up has a 2px dark outline (fill first, then stroke)
+- [ ] NO `shadowBlur`, `Math.random()`, `createLinearGradient()`, or `getImageData()` in any draw() function
+- [ ] All objects ≥ 20×20px (obstacles) or ≥ 16×16px (power-ups)
+- [ ] Backgrounds use cool, desaturated colors that recede behind warm obstacles
+
+**Content:**
 - [ ] Theme is creative, fun, and NOT tech-related
 - [ ] 3+ parallax layers with smooth scrolling (use modulo for tiling!)
 - [ ] 3+ ground obstacles + 1-2 air obstacles with weighted spawning
 - [ ] 2-3 power-ups with distinct effects and themed visuals
 - [ ] Character has idle animation and different run/jump/duck poses
+
+**Audio:**
 - [ ] All sounds are configured (at minimum: `jumpFreqs`, `collectFreqs`, `hitFreq`, `bgBPM`)
 - [ ] Background music plays during gameplay
+
+**Polish:**
 - [ ] Particle colors match the theme
 - [ ] Ground has scrolling detail texture
 - [ ] Unique UUID v4 gameId is set

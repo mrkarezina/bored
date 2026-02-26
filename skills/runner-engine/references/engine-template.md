@@ -371,6 +371,9 @@ const AudioEngine = (() => {
     return true;
   }
 
+  // Slight pitch variation so repeated sounds don't feel robotic
+  function pv(freq) { return freq * (0.95 + Math.random() * 0.1); }
+
   function tone(freq, dur, type, vol) {
     if (!ensure()) return;
     const o = ac.createOscillator();
@@ -421,24 +424,24 @@ const AudioEngine = (() => {
   function jump() {
     if (config.jump) { if (ensure()) config.jump(ac, master); return; }
     const f = config.jumpFreqs || [200, 500];
-    sweep(f[0], f[1], 0.15, 'square', 0.12);
+    sweep(pv(f[0]), pv(f[1]), 0.15, 'square', 0.12);
   }
 
   function doubleJump() {
     if (config.doubleJump) { if (ensure()) config.doubleJump(ac, master); return; }
     const f = config.jumpFreqs || [200, 500];
-    sweep(f[0] * 1.5, f[1] * 1.5, 0.1, 'square', 0.1);
+    sweep(pv(f[0] * 1.5), pv(f[1] * 1.5), 0.1, 'square', 0.1);
   }
 
   function land() {
     if (config.land) { if (ensure()) config.land(ac, master); return; }
-    sweep(150, 50, 0.1, 'sine', 0.15);
+    sweep(pv(150), pv(50), 0.1, 'sine', 0.15);
   }
 
   function die() {
     if (config.die) { if (ensure()) config.die(ac, master); return; }
     const f = config.hitFreq || 80;
-    sweep(400, f, 0.4, 'sawtooth', 0.2);
+    sweep(pv(400), pv(f), 0.4, 'sawtooth', 0.2);
     noise(0.2, 0, 0.1);
   }
 
@@ -446,11 +449,12 @@ const AudioEngine = (() => {
     if (config.collect) { if (ensure()) config.collect(ac, master); return; }
     const freqs = config.collectFreqs || [523, 659, 784];
     if (!ensure()) return;
+    const pvMult = 0.95 + Math.random() * 0.1;
     freqs.forEach((f, i) => {
       const o = ac.createOscillator();
       const g = ac.createGain();
       o.type = 'sine';
-      o.frequency.value = f;
+      o.frequency.value = f * pvMult;
       g.gain.setValueAtTime(0.001, ac.currentTime + i * 0.06);
       g.gain.linearRampToValueAtTime(0.12, ac.currentTime + i * 0.06 + 0.01);
       g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.06 + 0.15);
@@ -462,7 +466,7 @@ const AudioEngine = (() => {
 
   function score100() {
     if (config.score100) { if (ensure()) config.score100(ac, master); return; }
-    sweep(800, 1200, 0.06, 'sine', 0.08);
+    sweep(pv(800), pv(1200), 0.06, 'sine', 0.08);
   }
 
   function score1000() {
@@ -658,10 +662,11 @@ const ParticleEngine = (() => {
       p.rotation += p.vr * dt;
       p.alpha = Math.max(0, p.life / p.maxLife);
     }
-    // Shake decay
+    // Shake decay (damped sine wave for smooth, directed feel)
     if (shakeAmount > 0) {
-      shakeX = (Math.random() - 0.5) * shakeAmount * 2;
-      shakeY = (Math.random() - 0.5) * shakeAmount * 2;
+      const t = performance.now() * 0.03;
+      shakeX = Math.round(Math.sin(t) * shakeAmount);
+      shakeY = Math.round(Math.sin(t * 1.3) * shakeAmount);
       shakeAmount *= Math.pow(0.05, dt);
       if (shakeAmount < 0.5) { shakeAmount = 0; shakeX = 0; shakeY = 0; }
     }
@@ -1101,6 +1106,9 @@ const RunnerEngine = (() => {
     scaleX: 1, scaleY: 1, targetScaleX: 1, targetScaleY: 1,
   };
   let jumpHeld = false;
+  let jumpBuffered = false;
+  let jumpBufferTime = 0;
+  const JUMP_BUFFER_MS = 150;
 
   // Objects
   let obstacles = [];
@@ -1121,7 +1129,7 @@ const RunnerEngine = (() => {
 
   function start() {
     canvas = document.getElementById('game-canvas');
-    ctx = canvas.getContext('2d');
+    ctx = canvas.getContext('2d', { alpha: false });
     canvas.width = CW;
     canvas.height = CH;
 
@@ -1211,6 +1219,7 @@ const RunnerEngine = (() => {
     player.scaleX = 1; player.scaleY = 1;
     player.targetScaleX = 1; player.targetScaleY = 1;
     jumpHeld = false;
+    jumpBuffered = false;
 
     ParticleEngine.clearAll();
     FloatingText.clear();
@@ -1283,6 +1292,10 @@ const RunnerEngine = (() => {
       const jcfg = THEME.particles.jump;
       ParticleEngine.ring(player.x + pw.width / 2, player.y + pw.height / 2, jcfg.colors[0], 30);
       AudioEngine.doubleJump();
+    } else {
+      // Buffer jump for execution on landing
+      jumpBuffered = true;
+      jumpBufferTime = performance.now();
     }
   }
 
@@ -1429,6 +1442,13 @@ const RunnerEngine = (() => {
         player.grounded = true;
         player.jumps = 0;
         player.state = player.ducking ? 'duck' : 'run';
+        // Execute buffered jump
+        if (jumpBuffered && performance.now() - jumpBufferTime < JUMP_BUFFER_MS) {
+          jumpBuffered = false;
+          onJump();
+        } else {
+          jumpBuffered = false;
+        }
       }
     }
 
@@ -1438,11 +1458,19 @@ const RunnerEngine = (() => {
       ParticleEngine.trail(player.x, player.y + pw.height * 0.5, tcfg.colors, tcfg.size, effectiveSpeed * 50);
     }
 
-    // Spawn obstacles
+    // Spawn obstacles (with warm-up grace period and spacing validation)
     const now = performance.now();
-    if (now - lastSpawnTime >= spawnInterval) {
-      lastSpawnTime = now;
-      spawnObstacle();
+    if (now - lastSpawnTime >= spawnInterval && gameTime > 2) {
+      const minGap = effectiveSpeed * 30;
+      let canSpawn = true;
+      if (obstacles.length > 0) {
+        const last = obstacles[obstacles.length - 1];
+        if (CW + 20 - last.x < minGap) canSpawn = false;
+      }
+      if (canSpawn) {
+        lastSpawnTime = now;
+        spawnObstacle();
+      }
     }
 
     // Spawn powerups
@@ -1584,7 +1612,7 @@ const RunnerEngine = (() => {
       const offset = state === 'playing' || state === 'dying' ? distance : performance.now() * 0.02;
       for (const bg of THEME.backgrounds) {
         ctx.save();
-        try { bg.draw(ctx, offset * bg.speed, CW, CH); } catch(e) {}
+        try { bg.draw(ctx, Math.floor(offset * bg.speed), CW, CH); } catch(e) {}
         ctx.restore();
       }
     }
@@ -1592,14 +1620,14 @@ const RunnerEngine = (() => {
     // Ground
     const groundY = THEME.player.groundY + THEME.player.height;
     ctx.save();
-    try { THEME.drawGround(ctx, distance, groundY, CW, CH - groundY); } catch(e) {}
+    try { THEME.drawGround(ctx, Math.floor(distance), groundY, CW, CH - groundY); } catch(e) {}
     ctx.restore();
 
     // Obstacles
     for (const obs of obstacles) {
       if (!obs.active) continue;
       ctx.save();
-      try { obs.drawFn(ctx, obs.x, obs.y, obs.frame); } catch(e) {}
+      try { obs.drawFn(ctx, Math.floor(obs.x), Math.floor(obs.y), obs.frame); } catch(e) {}
       ctx.restore();
     }
 
@@ -1607,7 +1635,7 @@ const RunnerEngine = (() => {
     for (const pu of powerups) {
       if (!pu.active) continue;
       ctx.save();
-      try { pu.drawFn(ctx, pu.x, pu.y, pu.frame); } catch(e) {}
+      try { pu.drawFn(ctx, Math.floor(pu.x), Math.floor(pu.y), pu.frame); } catch(e) {}
       ctx.restore();
     }
 
@@ -1629,7 +1657,7 @@ const RunnerEngine = (() => {
       if (activeEffects['shield'] || activeEffects['invincible']) {
         ctx.globalAlpha = 0.6 + 0.4 * Math.sin(gameTime * 15);
       }
-      try { pw.draw(ctx, player.x, py, Math.floor(gameTime * 60), player.state); } catch(e) {}
+      try { pw.draw(ctx, player.x, Math.floor(py), Math.floor(gameTime * 60), player.state); } catch(e) {}
       ctx.restore();
     }
 

@@ -120,9 +120,13 @@ Array of obstacle types. Include at least 3 ground obstacles and 1-2 air obstacl
 - Air obstacles: weight 1-3 (less frequent than ground)
 
 **Guidelines:**
+- **Use angular, pointed shapes** — spikes, jagged edges, sharp corners (see Visual Clarity Rules)
+- **Use warm colors** (reds, oranges) so obstacles pop against cool backgrounds
+- **Include a 2px dark outline** — fill the shape first, then stroke with a darker color
 - Make each type visually distinct and thematically appropriate
 - Vary sizes — some short and wide, some tall and narrow
-- Add subtle animation using `frame` (wobble, glow, bounce)
+- Add subtle animation using `frame` (wobble, glow, bounce) — never `Math.random()`
+- Minimum size: 20×20 pixels
 - Ground obstacle heights should range from 20-80px
 - Air obstacle heights should be 20-40px
 
@@ -154,8 +158,12 @@ Array of collectible power-up types. Include 2-3:
 - `'magnet'` — attracts nearby power-ups for duration
 
 **Guidelines:**
+- **Use rounded shapes** — circles, ovals, orbs, pills (see Visual Clarity Rules)
+- **Use cool or bright colors** (blues, greens, golds) to contrast with warm obstacles
+- **Include a 2px outline** for readability against any background
 - Make power-ups visually distinct from obstacles (bright, glowing, animated)
-- Use `Math.sin(frame * 0.1)` for floating/pulsing animation
+- Use `Math.sin(frame * 0.1)` for floating/pulsing animation — never `Math.random()`
+- Minimum size: 16×16 pixels
 - spawnChance of 0.003 means roughly one every ~5-6 seconds
 - Shield: duration 0, invincible: 5000-8000, 2x-score: 5000-8000, slow-mo: 3000-5000, magnet: 5000-8000
 
@@ -293,6 +301,86 @@ See `audio-cookbook.md` for ready-to-use sound recipes.
 
 **Every sound function MUST create and start at least one oscillator or noise source.** Even minimal sounds drastically improve game feel.
 
+## Visual Clarity Rules
+
+These rules prevent the most common visual problems: flickering, unreadable objects, and obstacles that blend into backgrounds. The engine enforces some of these automatically, but draw functions must follow the rest.
+
+### Shape Language
+
+Humans read geometric forms instinctively. Use this to make gameplay elements instantly recognizable:
+
+- **Obstacles: angular, pointed shapes** — triangles, spikes, jagged edges, sharp corners. Danger reads as sharp.
+- **Power-ups: rounded shapes** — circles, ovals, pills, orbs. Safe/friendly reads as smooth.
+- **Background: rectangular, soft shapes** — blocks, gentle curves, horizontal lines. Neutral reads as structural.
+
+This is the single highest-impact visual clarity improvement. A player should know "that will kill me" from silhouette alone.
+
+### Color Temperature
+
+- **Obstacles: warm colors** (reds, oranges, yellows) — warm advances, reads as threat
+- **Power-ups: cool or bright colors** (blues, greens, golds) — cool/bright reads as reward
+- **Backgrounds: cool, desaturated colors** (muted blues, purples, grays) — recedes visually
+- **Ground: neutral, medium saturation** — anchors the scene without competing
+
+### Outlines
+
+Every obstacle and power-up draw function MUST include a dark outline for silhouette readability:
+
+```js
+// Pattern: fill first, then outline
+ctx.fillStyle = '#ff4444';
+ctx.beginPath();
+// ... shape path ...
+ctx.fill();
+ctx.strokeStyle = '#880000';  // darker version of fill color
+ctx.lineWidth = 2;
+ctx.stroke();
+```
+
+### Minimum Sizes
+
+- Obstacles: minimum 20×20 pixels. Anything smaller is invisible at speed.
+- Power-ups: minimum 16×16 pixels.
+- No more than 5-6 path operations for objects smaller than 40px — detail is wasted.
+
+### Banned APIs in draw() Functions
+
+These cause flickering, performance problems, or non-deterministic rendering:
+
+| Banned | Why | Use Instead |
+|--------|-----|-------------|
+| `shadowBlur` | Expensive Gaussian blur every frame | Draw a larger semi-transparent shape behind |
+| `Math.random()` | Different output each frame = flicker | Use `frame` parameter for animation |
+| `createLinearGradient()` | Allocates new objects 60x/sec | Use solid fills, or create gradient once outside draw |
+| `getImageData()` | Forces GPU→CPU transfer | Never use in game loop |
+| `globalCompositeOperation` | Flushes canvas state on each change | Stick to default `source-over` |
+
+### Drawing Best Practices
+
+- **Fill first, outline second.** Solid fill makes the shape readable; outline guarantees contrast.
+- **Max 6 colors per element.** More creates visual noise.
+- **Use `frame` for animation, not randomness.** `Math.sin(frame * 0.1)` is deterministic and smooth.
+- **Bilateral symmetry.** Symmetric sprites look more intentional and read faster.
+- **Silhouette test:** If your object isn't recognizable as a solid black shape on white, it won't read during gameplay.
+- **The engine wraps every draw() in save()/restore()** — do NOT call save/restore yourself inside draw functions.
+
+### Theme Style Tiers
+
+**Tier 1 — Nearly impossible to mess up:**
+- Silhouette/shadow themes (dark solid shapes on gradient sky)
+- Neon/wireframe (bright strokes on black)
+- Monochrome + one accent color
+
+**Tier 2 — Reliable with these constraints:**
+- Flat color with outlines (solid fills, dark outlines, no shading)
+- Geometric/abstract (circles, triangles, hexagons)
+- Retro pixel-art (blocky fillRect-based art)
+
+**Tier 3 — Avoid:**
+- Realistic environments (trees with leaves, buildings with windows)
+- Characters with consistent anatomy (humans, animals with limbs)
+- Themes requiring complex lighting or perspective
+
 ## Theme Creativity Rules
 
 1. **NO tech/developer themes** — no coding, no terminals, no keyboards
@@ -305,15 +393,29 @@ See `audio-cookbook.md` for ready-to-use sound recipes.
 ## Quality Checklist
 
 Before finishing a game, verify:
+
+**Visual clarity:**
+- [ ] Obstacles use angular/pointed shapes with warm colors
+- [ ] Power-ups use rounded shapes with cool/bright colors
+- [ ] All obstacles and power-ups have a 2px dark outline
+- [ ] No `shadowBlur`, `Math.random()`, `createLinearGradient()`, or `getImageData()` inside any draw() function
+- [ ] All objects pass the silhouette test (recognizable as solid black on white)
+- [ ] Minimum sizes: obstacles 20×20, power-ups 16×16
+
+**Content:**
 - [ ] 3+ parallax layers with smooth scrolling (use modulo for tiling!)
 - [ ] 3+ ground obstacles + 1-2 air obstacles, weighted for variety
 - [ ] 2-3 power-ups with different effects and themed visuals
 - [ ] Character has idle animation and reacts to run/jump/duck/hit states
+
+**Audio:**
 - [ ] All sounds are defined (either via config or custom functions)
 - [ ] Background music plays during gameplay
+
+**Polish:**
 - [ ] Particle colors match the theme
 - [ ] Ground has scrolling detail/texture
-- [ ] Colors create a cohesive, attractive palette
+- [ ] Colors create a cohesive, attractive palette (warm obstacles, cool backgrounds)
 - [ ] Game title and description are fun and descriptive
 - [ ] Unique UUID v4 gameId is set
 - [ ] Difficulty ramp feels fair (not too fast, not too slow)
