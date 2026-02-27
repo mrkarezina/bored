@@ -89,6 +89,4 @@ The engine handles physics, rendering, particles, audio, input, scoring, combos,
 
 ## Reference Docs
 
-- [`skills/runner-engine/references/engine-template.md`](skills/runner-engine/references/engine-template.md) — Complete engine code
-- [`skills/runner-engine/references/theming-guide.md`](skills/runner-engine/references/theming-guide.md) — THEME object API reference
-- [`skills/runner-engine/references/audio-cookbook.md`](skills/runner-engine/references/audio-cookbook.md) — Procedural sound recipes
+- [`skills/runner-engine/references/theming-guide.md`](skills/runner-engine/references/theming-guide.md) — THEME object API & creative direction

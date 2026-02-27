@@ -10,15 +10,13 @@ model: opus
 
 # /bored — Generate an Endless Runner Game
 
-You are a game designer and Canvas 2D artist. Your job is to create a **single-file HTML5 endless runner game** that is so fun and polished the player would text a friend about it.
+You are a game designer and Canvas 2D artist. Your job is to create a **theme** for a polished HTML5 endless runner game that is so fun the player would text a friend about it. The engine is already built — you only write the THEME object.
 
-## Step 1: Read the Engine Template
+## Step 1: Read the Theme Guide
 
-Read the engine template file at `skills/runner-engine/references/engine-template.md`. This contains the complete game engine with modular IIFEs for physics, rendering, particles, audio, input, HUD, and leaderboard integration.
+Read `skills/runner-engine/references/theming-guide.md` — documents every field in the THEME object.
 
-Also read:
-- `skills/runner-engine/references/theming-guide.md` — documents every field in the THEME object
-- `skills/runner-engine/references/audio-cookbook.md` — procedural sound recipes
+**Do NOT read engine module files.** The engine is pre-built and assembled by `build.sh`.
 
 ## Step 2: Invent a Creative Theme
 
@@ -45,44 +43,41 @@ Come up with a **fun, unexpected, specific** theme. The theme should make someon
 - "Arctic Dash" — a snowboarding fox on frozen tundra under aurora borealis
 - "Haunted Library" — a flying book dodging candles and bats
 
-## Step 3: Fill in the THEME Object
+## Step 3: Write theme.js
 
-Using the engine template as the base, fill in **only** the THEME object with:
+Write a `theme.js` file in the current directory containing **only** `const THEME = { ... };`
 
+The THEME object must include:
 1. **`name`** — Fun game title
 2. **`description`** — One-line hook
 3. **`gameId`** — Generate a unique UUID v4
 4. **`colors`** — Full color palette: `bg`, `text`, `accent`, `score`, `ground`, `groundLine`
 5. **`player`** — Character config with `width`, `height`, `duckHeight`, `groundY`, `jumpForce`, `gravity`, and `draw(ctx, x, y, frame, state)`. Draw different poses for `run`, `jump`, `duck`, and `hit` states. Add idle animation!
-6. **`obstacles[]`** — At least 3 ground obstacles + 1-2 air obstacles. Each with `type` ('ground'/'air'), `weight` for spawn probability, and `draw()`. Vary sizes and difficulty.
+6. **`obstacles[]`** — At least 3 ground obstacles + 1-2 air obstacles. Each with `type` ('ground'/'air'), `weight` for spawn probability, and `draw(ctx, x, y, frame)`. Vary sizes and difficulty.
 7. **`powerups[]`** — 2-3 collectible power-ups with themed visuals. Effects: `shield`, `invincible`, `2x-score`, `slow-mo`, or `magnet`. Include spawn chance and duration.
 8. **`backgrounds[]`** — At least 3 parallax layers: far (~0.15), mid (~0.4), near (~0.7). Use tiling patterns with modular arithmetic.
 9. **`drawGround(ctx, scrollX, groundY, w, h)`** — Themed scrolling ground surface
 10. **`particles`** — Colors for `dust`, `jump`, `death`, `collect`, `trail`, `confetti` — all matching theme
 11. **`scoring`** — Points config, combo decay, multiplier max
 12. **`difficulty`** — Speed ramp, spawn intervals
-13. **`sounds`** — Either simple config (`jumpFreqs`, `collectFreqs`, etc.) or full custom sound overrides. Use the audio cookbook as starting points.
+13. **`sounds`** — Simple config: `jumpFreqs`, `collectFreqs`, `hitFreq`, `bgBPM`
 
-## Step 4: Write the Game File
+## Step 4: Build & Open
 
-Write the complete game as a single `index.html` file in the current directory. The file should contain:
-- The filled-in THEME object at the top
-- The complete engine code below it (copy exactly from the template)
+Run: `bash skills/runner-engine/build.sh theme.js index.html && open index.html`
 
-## Step 5: Open in Browser
-
-Run `open index.html` to launch the game in the default browser.
+This assembles the theme with the pre-built engine modules into a single `index.html` file and opens it.
 
 ## Quality Checklist
 
 Before finishing, mentally verify:
 
 **Visual clarity (prevents flickering and unreadable objects):**
-- [ ] Obstacles use angular/pointed shapes with warm colors (reds, oranges)
-- [ ] Power-ups use rounded shapes with cool/bright colors (blues, greens, golds)
-- [ ] Every obstacle and power-up has a 2px dark outline (fill first, then stroke)
+- [ ] Player has `draw()` with different poses for run/jump/duck/hit states
+- [ ] Each obstacle has a `draw()` function with fill + stroke for outlines
+- [ ] Each power-up has a `draw()` function with distinct rounded/bright shapes
 - [ ] NO `shadowBlur`, `Math.random()`, `createLinearGradient()`, or `getImageData()` in any draw() function
-- [ ] All objects ≥ 20×20px (obstacles) or ≥ 16×16px (power-ups)
+- [ ] All objects >= 20x20px (obstacles) or >= 16x16px (power-ups)
 - [ ] Backgrounds use cool, desaturated colors that recede behind warm obstacles
 
 **Content:**
@@ -105,9 +100,9 @@ Before finishing, mentally verify:
 
 ## Important Notes
 
-- The engine handles ALL game logic — you only fill in the THEME object with visuals, sounds, and config
+- You ONLY write `theme.js` — the engine handles ALL game logic
 - Keep Canvas drawing code simple but charming — shapes and colors over complexity
 - Test your parallax layers mentally: do they tile seamlessly with `scrollX % spacing`?
-- Canvas is fixed at 800×400 — all coordinates are predictable
+- Canvas is fixed at 800x400 — all coordinates are predictable
 - The game automatically connects to the leaderboard at `https://www.bored.run`
-- UI overlays (menu, game over, name input) are DOM-based with CSS — styled automatically from THEME.colors
+- UI overlays (menu, game over) are DOM-based with CSS — styled automatically from THEME.colors

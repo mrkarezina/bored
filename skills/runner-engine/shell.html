@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Bored Game</title>
+<style>
+  :root {
+    --color-bg: #0a0a2e;
+    --color-text: #ffffff;
+    --color-accent: #ff6b6b;
+    --color-score: #ffd93d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #game-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  #game-canvas {
+    border-radius: 8px;
+    box-shadow: 0 0 40px rgba(255,255,255,0.05), 0 4px 20px rgba(0,0,0,0.3);
+    cursor: pointer;
+    display: block;
+  }
+  /* Menu Screen Overlay */
+  #menu-screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    border-radius: 8px;
+    z-index: 10;
+    transition: opacity 0.3s;
+  }
+  #menu-screen.hidden { opacity: 0; pointer-events: none; }
+  #game-title {
+    font-size: 2.4em;
+    font-weight: 800;
+    letter-spacing: -1px;
+    color: var(--color-accent);
+    text-shadow: 0 0 20px var(--color-accent);
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  #game-subtitle {
+    font-size: 1em;
+    opacity: 0.7;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  #menu-start-hint {
+    animation: pulse 2s ease-in-out infinite;
+    opacity: 0.6;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+  .controls-hint {
+    display: flex;
+    gap: 16px;
+    font-size: 0.8em;
+    opacity: 0.5;
+    margin-top: 16px;
+  }
+  .controls-hint kbd {
+    background: rgba(255,255,255,0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+  }
+  /* Game Over Screen */
+  #gameover-screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 30px;
+    background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(6px);
+    border-radius: 8px;
+    z-index: 10;
+    transition: opacity 0.3s;
+    overflow-y: auto;
+  }
+  #gameover-screen.hidden { opacity: 0; pointer-events: none; }
+  #gameover-title {
+    font-size: 1.8em;
+    font-weight: 700;
+    color: var(--color-accent);
+    margin-bottom: 4px;
+  }
+  #gameover-score {
+    font-size: 2.4em;
+    font-weight: 800;
+    color: var(--color-score);
+    text-shadow: 0 0 15px var(--color-score);
+  }
+  #gameover-highscore {
+    font-size: 0.9em;
+    opacity: 0.6;
+    margin-bottom: 16px;
+  }
+  #gameover-newrecord {
+    display: none;
+    font-size: 1em;
+    color: var(--color-score);
+    font-weight: 700;
+    animation: pulse 1s ease-in-out infinite;
+    margin-bottom: 8px;
+  }
+  /* Game Stats */
+  #game-stats {
+    width: 85%;
+    max-width: 350px;
+    margin: 8px 0;
+    display: flex;
+    justify-content: space-around;
+    text-align: center;
+  }
+  .stat-item {
+    opacity: 0;
+    animation: fadeSlideIn 0.3s ease forwards;
+  }
+  .stat-value {
+    font-size: 1.4em;
+    font-weight: 800;
+    color: var(--color-score);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-label {
+    font-size: 0.75em;
+    opacity: 0.5;
+    margin-top: 2px;
+  }
+  #gameover-world-record {
+    display: none;
+    font-size: 1.1em;
+    color: var(--color-score);
+    font-weight: 700;
+    animation: pulse 1s ease-in-out infinite;
+    margin-bottom: 8px;
+    text-shadow: 0 0 10px var(--color-score);
+  }
+  #gameover-restart {
+    font-size: 0.9em;
+    opacity: 0.5;
+    margin-top: 12px;
+    margin-bottom: 16px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  #game-footer {
+    font-size: 0.7em;
+    opacity: 0.3;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Menu Screen -->
+    <div id="menu-screen">
+      <div id="game-title">Game Title</div>
+      <div id="game-subtitle">Subtitle</div>
+      <div id="menu-start-hint">Press SPACE or tap to start</div>
+      <div class="controls-hint">
+        <span><kbd>SPACE</kbd> / <kbd>UP</kbd> Jump</span>
+        <span><kbd>DOWN</kbd> Duck</span>
+      </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameover-screen" class="hidden">
+      <div id="gameover-title">Game Over</div>
+      <div id="gameover-score">0</div>
+      <div id="gameover-newrecord">NEW RECORD!</div>
+      <div id="gameover-world-record">NEW WORLD RECORD!</div>
+      <div id="gameover-highscore">Best: 0</div>
+      <div id="game-stats"></div>
+      <div id="gameover-restart">Press SPACE or tap to play again</div>
+    </div>
+  </div>
+
+  <div id="game-footer">Made with /bored</div>
+
+<script>
+</script>
+</body>
+</html>
