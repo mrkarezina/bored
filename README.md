@@ -41,12 +41,14 @@ Claude interprets your idea creatively — "cats in space" might become "Cosmic 
 Every generated game includes:
 
 - **Canvas 2D graphics** — character, obstacles, parallax backgrounds, all drawn with code
-- **Physics** — jumps, ducking, difficulty ramp
+- **Tight physics** — variable jump height (tap vs hold), snappy fall gravity, hang time at apex, coyote time, input buffering
+- **Satisfying death** — hit freeze, screen shake, background flash, tumble animation
+- **Game feel** — squash & stretch, near-miss detection with bonus points, speed lines, running dust trail
 - **Power-ups** — shield, invincibility, 2x score, slow-mo, magnet with combo multiplier
-- **Procedural audio** — jump chirps, collect jingles, death sounds, background beat
-- **Particles** — dust, explosions, sparkles, trails, screen shake
+- **Procedural audio** — jump chirps, collect jingles with rising combo pitch, near-miss whoosh, death sounds, background beat
+- **Particles** — dust, explosions, sparkles, trails, speed lines, screen shake
 - **Score tracking** — play count and all-time high tracked at [bored.run](https://bored.run)
-- **Polished UI** — menu overlay, game-over screen with animated stats
+- **Polished UI** — menu overlay, game-over screen with animated stats, score lerp
 
 ## Sharing
 
@@ -68,7 +70,7 @@ Playable in any browser. Send the link to friends and compete for the all-time h
 
 The plugin has two parts:
 
-1. **Engine modules** — pre-built JavaScript (AudioEngine, ParticleEngine, InputHandler, HUD, Scoreboard, RunnerEngine) that handle all game logic on a fixed 800x400 canvas.
+1. **Engine modules** — pre-built JavaScript (AudioEngine, ParticleEngine, InputHandler, HUD, Scoreboard, ScoreboardUI, RunnerEngine) that handle all game logic on a fixed 800x400 canvas.
 
 2. **THEME object** — the creative part that changes per game. Contains all visuals (`draw()` functions using Canvas 2D), obstacles, power-ups, parallax layers, colors, difficulty, and sounds. Claude writes this fresh each time.
 
