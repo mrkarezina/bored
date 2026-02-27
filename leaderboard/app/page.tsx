@@ -162,24 +162,24 @@ export default async function Home() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <a
-              href="https://www.bored.run/play/a3c7e5f1-d8b2-4a96-bf40-6e9d1c3a5b82"
+              href="https://www.bored.run/play/c8e3f1a7-4b2d-4e9a-bf56-7d1c8a3e9f02"
               className="group rounded-xl overflow-hidden block"
             >
               <div className="h-px bg-gradient-to-r from-purple-500/50 via-purple-500/20 to-transparent" />
               <div className="bg-neutral-900/50 border border-neutral-800/50 border-t-0 px-4 py-3.5 rounded-b-xl group-hover:bg-neutral-800/40 transition-colors">
                 <span className="text-sm font-mono font-semibold text-neutral-300 group-hover:text-white transition-colors">
-                  Jungle Boogie
+                  Jetpack Monkey
                 </span>
               </div>
             </a>
             <a
-              href="https://www.bored.run/play/f8e2d1c0-b9a8-4765-9f3e-2d1c0b9a8765"
+              href="https://www.bored.run/play/b7e3a91f-4c28-4d5e-9f1a-8e2d6c3b5a74"
               className="group rounded-xl overflow-hidden block"
             >
               <div className="h-px bg-gradient-to-r from-purple-500/50 via-purple-500/20 to-transparent" />
               <div className="bg-neutral-900/50 border border-neutral-800/50 border-t-0 px-4 py-3.5 rounded-b-xl group-hover:bg-neutral-800/40 transition-colors">
                 <span className="text-sm font-mono font-semibold text-neutral-300 group-hover:text-white transition-colors">
-                  Cupids Rush
+                  Court Dash
                 </span>
               </div>
             </a>
