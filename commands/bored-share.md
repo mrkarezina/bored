@@ -1,5 +1,5 @@
 ---
-description: Share a local game to bored.run
+description: Share a local game to bored-claude.vercel.app
 allowed-tools:
   - Bash
   - Read
@@ -7,7 +7,7 @@ allowed-tools:
 model: haiku
 ---
 
-# /bored-share — Share a Game to bored.run
+# /bored-share — Share a Game to bored-claude.vercel.app
 
 Upload a local game HTML file so it's playable at a public URL.
 
@@ -24,11 +24,11 @@ Upload a local game HTML file so it's playable at a public URL.
 
 4. **Upload** — Run the following curl command:
    ```
-   curl -s -X POST https://www.bored.run/api/games/upload \
+   curl -s -X POST https://bored-claude.vercel.app/api/games/upload \
      -H "Content-Type: application/json" \
      -d "$(jq -n --arg html "$(cat <filename>)" --arg gameId "<gameId>" '{gameId: $gameId, html: $html}')"
    ```
 
 5. **Report the result:**
-   - On success, tell the user: "Game shared! Play it at: **https://www.bored.run/play/<gameId>**"
+   - On success, tell the user: "Game shared! Play it at: **https://bored-claude.vercel.app/play/<gameId>**"
    - On error, show the error message from the API response.

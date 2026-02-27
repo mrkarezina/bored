@@ -1,9 +1,9 @@
 /**
- * Scoreboard — Anonymous score tracking via bored.run API
+ * Scoreboard — Anonymous score tracking via bored-claude.vercel.app API
  * Embed verbatim. Gracefully degrades when offline.
  */
 const Scoreboard = (() => {
-  const API_URL = 'https://www.bored.run/api/scores';
+  const API_URL = 'https://bored-claude.vercel.app/api/scores';
 
   async function submitScore(gameId, gameName, theme, score) {
     try {

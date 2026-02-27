@@ -143,7 +143,7 @@ export default async function Home() {
                 </p>
                 <div className="mt-3 bg-neutral-950/80 rounded-lg border border-neutral-800/30 px-3 py-2">
                   <code className="text-xs font-mono text-neutral-500">
-                    bored.run/play/
+                    /play/
                     <span className="text-pink-400/80">your-game</span>
                   </code>
                 </div>
@@ -162,7 +162,7 @@ export default async function Home() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <a
-              href="https://www.bored.run/play/c8e3f1a7-4b2d-4e9a-bf56-7d1c8a3e9f02"
+              href="/play/c8e3f1a7-4b2d-4e9a-bf56-7d1c8a3e9f02"
               className="group rounded-xl overflow-hidden block"
             >
               <div className="h-px bg-gradient-to-r from-purple-500/50 via-purple-500/20 to-transparent" />
@@ -173,7 +173,7 @@ export default async function Home() {
               </div>
             </a>
             <a
-              href="https://www.bored.run/play/b7e3a91f-4c28-4d5e-9f1a-8e2d6c3b5a74"
+              href="/play/b7e3a91f-4c28-4d5e-9f1a-8e2d6c3b5a74"
               className="group rounded-xl overflow-hidden block"
             >
               <div className="h-px bg-gradient-to-r from-purple-500/50 via-purple-500/20 to-transparent" />

@@ -23,7 +23,7 @@ skills/runner-engine/
 │   ├── particle-engine.js     # ParticleEngine — explosions, sparkles, dust, screen shake
 │   ├── input-handler.js       # InputHandler — keyboard, touch, mouse
 │   ├── hud.js                 # HUD — score, combo, effect timers
-│   ├── scoreboard-client.js   # Scoreboard — POST/GET scores to bored.run
+│   ├── scoreboard-client.js   # Scoreboard — POST/GET scores to bored-claude.vercel.app
 │   ├── scoreboard-ui.js       # ScoreboardUI — game-over stats display
 │   └── runner-engine.js       # RunnerEngine — game loop, physics, rendering
 ├── shell.html                 # HTML+CSS+DOM template (menu, game-over overlays)
@@ -77,7 +77,7 @@ Each engine module is a self-contained IIFE communicating via globals (e.g., Run
 
 ## Scoreboard
 
-- API at `https://www.bored.run/api/scores`
+- API at `https://bored-claude.vercel.app/api/scores`
 - POST `{ gameId, gameName, theme, score }` → `{ playCount, allTimeHigh, isNewRecord }`
 - GET `?gameId=<uuid>` → `{ playCount, allTimeHigh }`
 - Anonymous: no player names, personal best in localStorage per gameId

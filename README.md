@@ -4,14 +4,20 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin that gene
 
 Every game is a self-contained `index.html` — no dependencies, no build step, no frameworks. Just open it in a browser and play.
 
-Try games made with /bored at **[bored.run](https://bored.run)**
+Try games made with /bored at **[bored-claude.vercel.app](https://bored-claude.vercel.app)**
 
 ## Install
 
 In Claude Code:
 
 ```
-/install-plugin bored@bored-games
+/plugin marketplace add mrkarezina/bored
+```
+
+or:
+
+```
+/plugin install bored@bored-games
 ```
 
 ## Usage
@@ -47,7 +53,7 @@ Every generated game includes:
 - **Power-ups** — shield, invincibility, 2x score, slow-mo, magnet with combo multiplier
 - **Procedural audio** — jump chirps, collect jingles with rising combo pitch, near-miss whoosh, death sounds, background beat
 - **Particles** — dust, explosions, sparkles, trails, speed lines, screen shake
-- **Score tracking** — play count and all-time high tracked at [bored.run](https://bored.run)
+- **Score tracking** — play count and all-time high tracked at [bored-claude.vercel.app](https://bored-claude.vercel.app)
 - **Polished UI** — menu overlay, game-over screen with animated stats, score lerp
 
 ## Sharing
@@ -58,10 +64,10 @@ After generating a game, share it:
 /bored-share
 ```
 
-Uploads your game to [bored.run](https://bored.run) and gives you a link:
+Uploads your game to [bored-claude.vercel.app](https://bored-claude.vercel.app) and gives you a link:
 
 ```
-https://www.bored.run/play/<gameId>
+https://bored-claude.vercel.app/play/<gameId>
 ```
 
 Playable in any browser. Send the link to friends and compete for the all-time high.
