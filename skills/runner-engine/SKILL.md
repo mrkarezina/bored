@@ -14,71 +14,63 @@ This skill provides context about the /bored endless runner game engine. Use it 
 
 ## Architecture
 
-The engine is split into static module files that are assembled by `build.sh`:
+The engine is a set of JS module files (IIFEs) that get embedded into a single HTML file with the THEME object:
 
 ```
 skills/runner-engine/
-├── engine/                    # Pre-built engine modules (do not modify)
-│   ├── constants.js           # LEADERBOARD_URL
-│   ├── audio-engine.js        # AudioEngine IIFE (Web Audio API, procedural sounds, beat music)
-│   ├── particle-engine.js     # ParticleEngine IIFE (300-pool, dust/ring/death/sparkle/confetti/trail)
-│   ├── input-handler.js       # InputHandler IIFE (keyboard, touch, mouse, swipe detection)
-│   ├── hud.js                 # HUD IIFE (score, combo, effect timers, elapsed time)
-│   ├── scoreboard-client.js   # ScoreboardClient IIFE (POST scores, GET stats)
-│   ├── scoreboard-ui.js       # ScoreboardUI IIFE (game-over stats display)
-│   ├── speed-lines.js         # SpeedLines IIFE (motion blur effect)
-│   ├── floating-text.js       # FloatingText IIFE (combo/near-miss text popups)
-│   └── runner-engine.js       # RunnerEngine IIFE (game loop, physics, spawning, rendering) + boot
+├── engine/
+│   ├── audio-engine.js        # AudioEngine — Web Audio API synth
+│   ├── particle-engine.js     # ParticleEngine — explosions, sparkles, dust, screen shake
+│   ├── input-handler.js       # InputHandler — keyboard, touch, mouse
+│   ├── hud.js                 # HUD — score, combo, effect timers
+│   ├── scoreboard-client.js   # Scoreboard — POST/GET scores to bored.run
+│   ├── scoreboard-ui.js       # ScoreboardUI — game-over stats display
+│   └── runner-engine.js       # RunnerEngine — game loop, physics, rendering
 ├── shell.html                 # HTML+CSS+DOM template (menu, game-over overlays)
-├── build.sh                   # Assembles theme.js + engine modules → index.html
 └── references/
     └── theming-guide.md       # THEME object API & creative direction
 ```
 
-### Build Flow
+### How Games Are Built
 
-1. Claude reads `theming-guide.md`
-2. Claude writes `theme.js` (~300 lines) — just `const THEME = { ... };`
-3. `build.sh theme.js index.html` concatenates: shell HTML + theme + engine modules → single-file HTML
-4. Game opens in browser
+1. Claude reads `theming-guide.md` for the THEME API
+2. Claude writes a `const THEME = { ... }` with creative visuals, obstacles, power-ups
+3. Claude reads shell.html + all engine modules
+4. Claude assembles everything into a single `index.html`: shell HTML + THEME + engine modules + boot line
+5. Game opens in browser
 
-Each engine module is a self-contained IIFE. They communicate via globals (e.g., RunnerEngine calls `AudioEngine.play()`). No imports/exports needed.
-
-## Key Reference Files
-
-- `skills/runner-engine/references/theming-guide.md` — THEME object API & creative direction
+Each engine module is a self-contained IIFE communicating via globals (e.g., RunnerEngine calls `AudioEngine.jump()`).
 
 ## Engine Features
 
-- Fixed-timestep physics (120Hz) with variable rendering
-- State machine: menu → playing → dying → gameover
-- Variable-height jumps (hold=float, release=fast fall) + double jump
-- Ducking mechanic (Down/S key, swipe-down on mobile) — duck under air obstacles
-- Power-up system with 5 effect types: shield, invincible, 2x-score, slow-mo, magnet
-- Combo system: consecutive pickups increase multiplier (1x → 5x max) with flash text
-- Weighted obstacle spawning (no score-threshold unlocking)
-- Object-pooled particles (300 pre-allocated, zero GC) — dust, ring, death, sparkle, confetti, trail
-- Procedural Web Audio API sounds + beat-scheduled music
-- Modular HUD: zero-padded score, high score, combo, effect timers, elapsed time
-- Screen shake, squash/stretch, hit freeze, speed lines, near-miss detection
-- Difficulty ramp: configurable speed and spawn intervals
-- Forgiving hitboxes (4px padding on each side)
-- DOM-based UI: menu overlay with backdrop blur, game-over with stats
-- Full input support: keyboard (Space/Up/W = jump, Down/S = duck), touch (tap/swipe), mouse
+- Variable delta-time physics with frame cap
+- State machine: menu → playing → game over
+- Jump (Space/Up/W, tap) + duck (Down/S, swipe down) mechanics
+- Power-up system: shield, invincible, 2x-score, slow-mo, magnet
+- Combo system: consecutive pickups increase multiplier up to configurable max
+- Weighted obstacle spawning with difficulty ramp
+- Particle effects: dust, bursts, explosions, sparkles, trails
+- Screen shake on death
+- Procedural Web Audio sounds + background beat
+- HUD: score, high score, combo counter, effect timers, elapsed time
+- DOM-based UI: menu overlay with backdrop blur, game-over with animated stats
+- Full input: keyboard, touch (tap/swipe), mouse click
+- Responsive canvas scaling
+- Forgiving hitboxes (4px padding)
 
-## Leaderboard
+## Scoreboard
 
-- Backend: Next.js + Supabase at `https://bored.run`
-- Each game gets a unique UUID v4 `gameId`
-- Anonymous play tracking: no player names, API returns `{ playCount, allTimeHigh, isNewRecord }`
-- Scores submitted via POST to `/api/scores` on game over
-- Game-over shows: score count-up, personal best, all-time high, play count, "NEW WORLD RECORD!" for new highs
-- High score persisted per gameId in localStorage
+- API at `https://www.bored.run/api/scores`
+- POST `{ gameId, gameName, theme, score }` → `{ playCount, allTimeHigh, isNewRecord }`
+- GET `?gameId=<uuid>` → `{ playCount, allTimeHigh }`
+- Anonymous: no player names, personal best in localStorage per gameId
+- Each game gets a unique UUID v4 `gameId` hardcoded in the THEME
+- Game-over shows: score count-up, personal best, all-time high, play count, "NEW WORLD RECORD!"
 
 ## Common Issues
 
-- **No sound on mobile**: Audio requires user gesture — the engine handles this via `AudioEngine.ensure()` on first input
-- **Parallax tearing**: Ensure layers use `-(scrollX % spacing)` for seamless tiling
-- **Power-ups not spawning**: Check `spawnChance` is set (0.001-0.005 range) and `powerups` array is populated
-- **Air obstacles too easy/hard**: Adjust `duckHeight` in player config and air obstacle dimensions
-- **Score not submitting**: Check that `THEME.gameId` is a valid UUID and `LEADERBOARD_URL` is correct
+- **No sound on mobile**: Audio requires user gesture — engine resumes AudioContext on first input
+- **Parallax tearing**: Use `-(scrollX % spacing)` for seamless tiling
+- **Power-ups not spawning**: Check `spawnChance` (0.001-0.005 range) and `powerups` array
+- **Air obstacles too easy/hard**: Adjust `duckHeight` and air obstacle dimensions
+- **Flickering sprites**: Never use `shadowBlur`, `Math.random()`, `createLinearGradient()` in draw() functions

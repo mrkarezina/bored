@@ -1,159 +1,159 @@
-// --- ParticleEngine IIFE ---
+/**
+ * ParticleEngine — Visual effects system
+ * Embed verbatim. Supports explosions, trails, sparkles, screen shake.
+ */
 const ParticleEngine = (() => {
-  const POOL_SIZE = 300;
-  const pool = [];
   let ctx = null;
-  let cw = 800, ch = 400;
-  let shakeX = 0, shakeY = 0;
-  let shakeAmount = 0;
+  let canvasW = 800;
+  let canvasH = 400;
+  let particles = [];
+  let shakeX = 0;
+  let shakeY = 0;
+  let shakeDuration = 0;
+  let shakeIntensity = 0;
+  let shakeStart = 0;
 
-  for (let i = 0; i < POOL_SIZE; i++) {
-    pool.push({ active: false, x:0, y:0, vx:0, vy:0, life:0, maxLife:1, type:'dust', color:'#FFF', size:4, rotation:0, vr:0, alpha:1, gravity:0 });
+  function init(context, w, h) {
+    ctx = context;
+    canvasW = w;
+    canvasH = h;
   }
 
-  function init(context, w, h) { ctx = context; cw = w; ch = h; }
-
-  function emit(x, y, vx, vy, life, type, color, size, gravity) {
-    for (let i = 0; i < POOL_SIZE; i++) {
-      const p = pool[i];
-      if (!p.active) {
-        p.active = true;
-        p.x = x; p.y = y; p.vx = vx; p.vy = vy;
-        p.life = life; p.maxLife = life;
-        p.type = type; p.color = color; p.size = size || 4;
-        p.rotation = Math.random() * Math.PI * 2;
-        p.vr = (Math.random() - 0.5) * 10;
-        p.alpha = 1;
-        p.gravity = gravity || 0;
-        return p;
-      }
-    }
-    return null;
-  }
-
-  function burst(x, y, count, type, colors, sizeRange, speedRange, lifeRange, gravity) {
+  function emit(x, y, color, count, type) {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = speedRange[0] + Math.random() * (speedRange[1] - speedRange[0]);
-      const life = lifeRange[0] + Math.random() * (lifeRange[1] - lifeRange[0]);
-      const size = sizeRange[0] + Math.random() * (sizeRange[1] - sizeRange[0]);
-      const color = colors[Math.floor(Math.random() * colors.length)];
-      emit(x, y, Math.cos(angle)*speed, Math.sin(angle)*speed, life, type, color, size, gravity || 400);
+      const speed = 1 + Math.random() * 3;
+      particles.push({
+        x, y, color,
+        vx: Math.cos(angle) * speed * (type === 'dust' ? 0.5 : 1),
+        vy: type === 'dust' ? -Math.random() * 2 : Math.sin(angle) * speed,
+        life: 1.0,
+        decay: 0.02 + Math.random() * 0.03,
+        size: type === 'dust' ? 2 + Math.random() * 2 : 3 + Math.random() * 3,
+        type: type || 'burst',
+      });
     }
   }
 
-  function dust(x, y, count, colors, size) {
-    const c = colors || ['#D2B48C','#C4A882'];
-    const s = size || 4;
-    for (let i = 0; i < count; i++) {
-      const vx = (Math.random() - 0.5) * 150;
-      const vy = -Math.random() * 100 - 30;
-      emit(x + (Math.random()-0.5)*20, y, vx, vy, 0.4 + Math.random()*0.3, 'dust', c[Math.floor(Math.random()*c.length)], s * (0.5+Math.random()*0.5), 300);
+  function explosion(x, y, color, count) {
+    for (let i = 0; i < (count || 15); i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2 + Math.random() * 6;
+      particles.push({
+        x, y, color,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1.0,
+        decay: 0.015 + Math.random() * 0.02,
+        size: 3 + Math.random() * 5,
+        type: 'explosion',
+      });
     }
   }
 
-  function ring(x, y, color, maxRadius) {
-    emit(x, y, 0, 0, 0.4, 'ring', color || '#FFD700', maxRadius || 30, 0);
+  function sparkle(x, y, color, count) {
+    for (let i = 0; i < (count || 10); i++) {
+      particles.push({
+        x: x + (Math.random() - 0.5) * 60,
+        y: y + (Math.random() - 0.5) * 40,
+        color,
+        vx: (Math.random() - 0.5) * 2,
+        vy: -1 - Math.random() * 3,
+        life: 1.0,
+        decay: 0.01 + Math.random() * 0.02,
+        size: 2 + Math.random() * 3,
+        type: 'sparkle',
+      });
+    }
   }
 
-  function explosion(x, y, colors, size) {
-    const c = colors || ['#FF4444','#FF8800','#FFDD44'];
-    const s = size || 6;
-    burst(x, y, 25, 'death', c, [3, s], [100, 350], [0.5, 1.2], 500);
+  function trail(x, y, color) {
+    particles.push({
+      x: x + (Math.random() - 0.5) * 4,
+      y: y + (Math.random() - 0.5) * 4,
+      color,
+      vx: -1 - Math.random(),
+      vy: (Math.random() - 0.5) * 0.5,
+      life: 0.8,
+      decay: 0.04,
+      size: 2 + Math.random() * 2,
+      type: 'trail',
+    });
   }
 
-  function trail(x, y, colors, size, gameSpeed) {
-    const c = colors || ['#FFFFFF'];
-    const s = size || 3;
-    emit(x, y, -(gameSpeed||300)*0.3 + (Math.random()-0.5)*30, (Math.random()-0.5)*20, 0.3+Math.random()*0.2, 'trail', c[Math.floor(Math.random()*c.length)], s*(0.5+Math.random()*0.5), 0);
-  }
-
-  function sparkle(x, y, colors, size, count) {
-    const c = colors || ['#FFD700','#FFA500'];
-    const s = size || 4;
-    burst(x, y, count || 12, 'sparkle', c, [2, s], [60, 200], [0.5, 1.0], 200);
-  }
-
-  function confetti(x, y, colors, size, count) {
-    const c = colors || ['#FF0000','#00FF00','#0000FF','#FFFF00','#FF00FF'];
-    const s = size || 5;
-    burst(x, y, count || 30, 'confetti', c, [3, s], [80, 250], [0.8, 1.5], 300);
-  }
-
-  function screenShake(amount) {
-    shakeAmount = Math.max(shakeAmount, amount);
-  }
-
-  function clearAll() {
-    for (let i = 0; i < POOL_SIZE; i++) pool[i].active = false;
-    shakeAmount = 0; shakeX = 0; shakeY = 0;
+  function screenShake(intensity, duration) {
+    shakeIntensity = intensity;
+    shakeDuration = duration;
+    shakeStart = performance.now();
   }
 
   function update(dt) {
-    for (let i = 0; i < POOL_SIZE; i++) {
-      const p = pool[i];
-      if (!p.active) continue;
-      p.life -= dt;
-      if (p.life <= 0) { p.active = false; continue; }
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.vy += p.gravity * dt;
-      p.rotation += p.vr * dt;
-      p.alpha = Math.max(0, p.life / p.maxLife);
+    // Update particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.type === 'explosion' || p.type === 'burst') {
+        p.vy += 0.1; // gravity on explosions
+      }
+      p.life -= p.decay;
+      if (p.life <= 0) {
+        particles.splice(i, 1);
+      }
     }
-    // Shake decay (damped sine wave for smooth, directed feel)
-    if (shakeAmount > 0) {
-      const t = performance.now() * 0.03;
-      shakeX = Math.round(Math.sin(t) * shakeAmount);
-      shakeY = Math.round(Math.sin(t * 1.3) * shakeAmount);
-      shakeAmount *= Math.pow(0.05, dt);
-      if (shakeAmount < 0.5) { shakeAmount = 0; shakeX = 0; shakeY = 0; }
+
+    // Cap particles
+    if (particles.length > 200) {
+      particles = particles.slice(-200);
+    }
+
+    // Screen shake
+    if (shakeDuration > 0) {
+      const elapsed = performance.now() - shakeStart;
+      if (elapsed < shakeDuration) {
+        const progress = 1 - elapsed / shakeDuration;
+        shakeX = (Math.random() - 0.5) * shakeIntensity * progress * 2;
+        shakeY = (Math.random() - 0.5) * shakeIntensity * progress * 2;
+      } else {
+        shakeX = 0;
+        shakeY = 0;
+        shakeDuration = 0;
+      }
     }
   }
 
-  function draw(layer) {
-    // layer 0 = behind player, layer 1 = in front, undefined = all
-    for (let i = 0; i < POOL_SIZE; i++) {
-      const p = pool[i];
-      if (!p.active) continue;
-      const isFront = (p.type === 'confetti' || p.type === 'ring' || p.type === 'sparkle');
-      if (layer === 0 && isFront) continue;
-      if (layer === 1 && !isFront) continue;
+  function draw() {
+    if (!ctx) return;
 
+    // Apply screen shake
+    if (shakeX !== 0 || shakeY !== 0) {
       ctx.save();
-      ctx.globalAlpha = p.alpha;
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rotation);
+      ctx.translate(shakeX, shakeY);
+    }
 
-      if (p.type === 'ring') {
-        const progress = 1 - (p.life / p.maxLife);
-        const radius = p.size * progress;
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = 2 * (1 - progress);
-        ctx.beginPath();
-        ctx.arc(0, 0, radius, 0, Math.PI * 2);
-        ctx.stroke();
-      } else if (p.type === 'confetti') {
-        ctx.fillStyle = p.color;
-        ctx.fillRect(-p.size/2, -p.size/4, p.size, p.size/2);
-      } else if (p.type === 'sparkle') {
-        ctx.fillStyle = p.color;
+    for (const p of particles) {
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      if (p.type === 'sparkle') {
+        // Star shape
         ctx.save();
+        ctx.translate(p.x, p.y);
         ctx.rotate(p.life * Math.PI * 2);
-        const s = p.size * p.alpha;
-        ctx.fillRect(-s/2, -s/2, s, s);
+        const s = p.size * p.life;
+        ctx.fillRect(-s / 2, -s / 2, s, s);
         ctx.restore();
       } else {
-        ctx.fillStyle = p.color;
         ctx.beginPath();
-        ctx.arc(0, 0, p.size * p.alpha, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
         ctx.fill();
       }
+    }
+    ctx.globalAlpha = 1;
+
+    if (shakeX !== 0 || shakeY !== 0) {
       ctx.restore();
     }
   }
 
-  function getShake() { return { x: shakeX, y: shakeY }; }
-
-  return { init, emit, burst, dust, ring, explosion, trail, sparkle, confetti, screenShake, clearAll, update, draw, getShake };
+  return { init, emit, explosion, sparkle, trail, screenShake, update, draw };
 })();

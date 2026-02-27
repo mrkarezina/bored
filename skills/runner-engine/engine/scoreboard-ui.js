@@ -1,4 +1,7 @@
-// --- ScoreboardUI IIFE ---
+/**
+ * ScoreboardUI — Game-over screen with anonymous stats
+ * Embed verbatim. Shows score, personal best, global stats.
+ */
 const ScoreboardUI = (() => {
   let theme = null;
 

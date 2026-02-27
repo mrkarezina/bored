@@ -1,109 +1,109 @@
-// --- RunnerEngine IIFE ---
+/**
+ * RunnerEngine — Complete endless runner game framework
+ * Embed verbatim. Customize via THEME config object.
+ */
 const RunnerEngine = (() => {
-  // Fixed canvas size
-  const CW = 800, CH = 400;
+  // State machine
+  const STATE = { MENU: 0, PLAYING: 1, GAME_OVER: 2 };
+  let state = STATE.MENU;
+  let theme = null;
   let canvas, ctx;
 
-  // State
-  let state = 'menu'; // menu, playing, dying, gameover
+  // Game state
   let score = 0;
   let highScore = 0;
-  let gameSpeed = 0;
   let distance = 0;
-  let gameTime = 0; // seconds
-  let elapsed = 0;  // ms
-  let lastFrameTime = 0;
+  let speed = 0;
+  let frame = 0;
   let gameStartTime = 0;
+  let lastFrameTime = 0;
+  let elapsed = 0;
 
-  // Physics (fixed timestep)
-  const PHYSICS_DT = 1 / 120;
-  let accumulator = 0;
-  let hitFreezeFrames = 0;
-  let dyingTimer = 0;
-  let deathFlashAlpha = 0;
+  // Player state
+  let playerX = 80;
+  let playerY = 0;
+  let playerVY = 0;
+  let isJumping = false;
+  let isDucking = false;
+  let isGrounded = true;
+  let playerState = 'run'; // run, jump, duck, hit
 
-  // Player
-  const player = {
-    x: 80, y: 0, vy: 0,
-    grounded: true, jumps: 0, maxJumps: 2,
-    ducking: false,
-    state: 'run', // run, jump, duck, hit
-    scaleX: 1, scaleY: 1, targetScaleX: 1, targetScaleY: 1,
-  };
-  let jumpHeld = false;
-  let jumpBuffered = false;
-  let jumpBufferTime = 0;
-  const JUMP_BUFFER_MS = 150;
+  // Active power-up effects
+  let activeEffects = {};  // { effectName: { remaining: ms, powerup: ref } }
 
-  // Objects
+  // Object pools
   let obstacles = [];
   let powerups = [];
   let lastSpawnTime = 0;
   let spawnInterval = 0;
 
-  // Combo
+  // Combo system
   let combo = 0;
   let comboMultiplier = 1;
   let lastCollectTime = 0;
 
-  // Active power-up effects
-  let activeEffects = {}; // { effectName: { remaining: ms, powerup: ref } }
+  // Difficulty
+  let currentSpeed = 0;
+  let currentSpawnInterval = 0;
 
-  // Score tracking
-  let prevMilestone = 0;
+  // Canvas scaling
+  let scale = 1;
+  let offsetX = 0;
+  let offsetY = 0;
 
-  function start() {
+  function start(themeConfig) {
+    theme = themeConfig;
     canvas = document.getElementById('game-canvas');
-    ctx = canvas.getContext('2d', { alpha: false });
-    canvas.width = CW;
-    canvas.height = CH;
+    ctx = canvas.getContext('2d');
+    canvas.width = theme.canvasWidth || 800;
+    canvas.height = theme.canvasHeight || 400;
 
-    // Responsive scaling
+    // Load high score
+    highScore = parseInt(localStorage.getItem('bored-hs-' + theme.gameId) || '0');
+
+    // Set up responsive scaling
     handleResize();
     window.addEventListener('resize', handleResize);
 
-    // Load high score
-    highScore = parseInt(localStorage.getItem('bored-hs-' + THEME.gameId) || '0');
+    // Initialize subsystems
+    InputHandler.init(canvas, { onJump, onDuck, onDuckRelease, onAction });
+    AudioEngine.init(theme.sounds || {});
+    ParticleEngine.init(ctx, canvas.width, canvas.height);
+    HUD.init(ctx, theme);
+    ScoreboardUI.init(theme);
 
-    // Set CSS custom properties from theme
-    document.documentElement.style.setProperty('--color-bg', THEME.colors.bg);
-    document.documentElement.style.setProperty('--color-text', THEME.colors.text);
-    document.documentElement.style.setProperty('--color-accent', THEME.colors.accent);
-    document.documentElement.style.setProperty('--color-score', THEME.colors.score);
-    document.body.style.backgroundColor = THEME.colors.bg;
+    // Set UI colors
+    document.documentElement.style.setProperty('--color-bg', theme.colors.bg);
+    document.documentElement.style.setProperty('--color-text', theme.colors.text);
+    document.documentElement.style.setProperty('--color-accent', theme.colors.accent);
+    document.documentElement.style.setProperty('--color-score', theme.colors.score);
+    document.body.style.backgroundColor = theme.colors.bg;
+    document.body.style.color = theme.colors.text;
 
-    // Update DOM text
+    // Update UI text
     const titleEl = document.getElementById('game-title');
-    if (titleEl) titleEl.textContent = THEME.name;
+    if (titleEl) titleEl.textContent = theme.name;
     const subtitleEl = document.getElementById('game-subtitle');
-    if (subtitleEl) subtitleEl.textContent = THEME.description;
-
-    // Init subsystems
-    AudioEngine.init(THEME.sounds);
-    ParticleEngine.init(ctx, CW, CH);
-    HUD.init(ctx, THEME);
-    ScoreboardUI.init(THEME);
-    SpeedLines.init(ctx);
-    FloatingText.init(ctx);
-    InputHandler.init(canvas, { onJump, onJumpRelease, onDuck, onDuckRelease });
+    if (subtitleEl) subtitleEl.textContent = 'Press SPACE or tap to start';
 
     showMenu();
-    requestAnimationFrame((t) => { lastFrameTime = t; gameLoop(t); });
+    requestAnimationFrame(gameLoop);
   }
 
   function handleResize() {
-    if (!canvas) return;
+    const container = canvas.parentElement;
+    if (!container) return;
     const maxW = Math.min(window.innerWidth - 20, 900);
-    const maxH = Math.min(window.innerHeight - 100, 550);
-    const scaleX = maxW / CW;
-    const scaleY = maxH / CH;
-    const s = Math.min(scaleX, scaleY, 1.5);
-    canvas.style.width = (CW * s) + 'px';
-    canvas.style.height = (CH * s) + 'px';
+    const maxH = Math.min(window.innerHeight - 200, 500);
+    const scaleX = maxW / canvas.width;
+    const scaleY = maxH / canvas.height;
+    scale = Math.min(scaleX, scaleY, 1.5);
+    canvas.style.width = (canvas.width * scale) + 'px';
+    canvas.style.height = (canvas.height * scale) + 'px';
   }
 
   function showMenu() {
-    state = 'menu';
+    state = STATE.MENU;
     const menuEl = document.getElementById('menu-screen');
     const overEl = document.getElementById('gameover-screen');
     if (menuEl) menuEl.classList.remove('hidden');
@@ -111,169 +111,204 @@ const RunnerEngine = (() => {
   }
 
   function startGame() {
-    state = 'playing';
+    state = STATE.PLAYING;
     score = 0;
     distance = 0;
-    gameTime = 0;
-    elapsed = 0;
-    gameStartTime = performance.now();
+    frame = 0;
     combo = 0;
     comboMultiplier = 1;
     lastCollectTime = 0;
     obstacles = [];
     powerups = [];
     activeEffects = {};
-    prevMilestone = 0;
-    hitFreezeFrames = 0;
-    deathFlashAlpha = 0;
-    accumulator = 0;
+    playerY = theme.player.groundY;
+    playerVY = 0;
+    isJumping = false;
+    isDucking = false;
+    isGrounded = true;
+    playerState = 'run';
+    gameStartTime = performance.now();
+    lastFrameTime = gameStartTime;
+    elapsed = 0;
+    currentSpeed = theme.difficulty.startSpeed;
+    currentSpawnInterval = theme.difficulty.startSpawnInterval;
+    lastSpawnTime = gameStartTime;
 
-    const diff = THEME.difficulty;
-    gameSpeed = diff.startSpeed;
-    spawnInterval = diff.startSpawnInterval;
-    lastSpawnTime = performance.now();
-
-    // Reset player
-    player.x = 80;
-    player.y = THEME.player.groundY;
-    player.vy = 0;
-    player.grounded = true;
-    player.jumps = 0;
-    player.ducking = false;
-    player.state = 'run';
-    player.scaleX = 1; player.scaleY = 1;
-    player.targetScaleX = 1; player.targetScaleY = 1;
-    jumpHeld = false;
-    jumpBuffered = false;
-
-    ParticleEngine.clearAll();
-    FloatingText.clear();
-    SpeedLines.clear();
-
+    // Hide menu
     const menuEl = document.getElementById('menu-screen');
     const overEl = document.getElementById('gameover-screen');
     if (menuEl) menuEl.classList.add('hidden');
     if (overEl) overEl.classList.add('hidden');
 
-    AudioEngine.ensure();
     AudioEngine.bgBeat(true);
   }
 
-  function die() {
-    if (state !== 'playing') return;
-    state = 'dying';
-    player.state = 'hit';
-    dyingTimer = 0.5;
-    hitFreezeFrames = 4;
-    deathFlashAlpha = 1;
-    ParticleEngine.screenShake(10);
-    const pcfg = THEME.particles.death;
-    ParticleEngine.explosion(
-      player.x + THEME.player.width / 2,
-      player.y + THEME.player.height / 2,
-      pcfg.colors, pcfg.size
-    );
-    AudioEngine.die();
+  function gameOver() {
+    state = STATE.GAME_OVER;
+    AudioEngine.hit();
     AudioEngine.bgBeat(false);
-    const finalScore = Math.floor(score);
-    if (finalScore > highScore) {
-      highScore = finalScore;
-      localStorage.setItem('bored-hs-' + THEME.gameId, String(highScore));
+    ParticleEngine.explosion(playerX + theme.player.width / 2, playerY, theme.colors.accent, 30);
+    ParticleEngine.screenShake(10, 300);
+
+    // Save high score
+    if (score > highScore) {
+      highScore = score;
+      localStorage.setItem('bored-hs-' + theme.gameId, String(highScore));
     }
-  }
 
-  function goToGameOver() {
-    state = 'gameover';
-    // Submit score + show UI
-    ScoreboardClient.submitScore(THEME.gameId, THEME.name, THEME.description, score).then((result) => {
-      ScoreboardUI.showGameOver(score, highScore, result);
-    });
-  }
-
-  // --- Input callbacks ---
-  function onJump() {
-    AudioEngine.ensure();
-    if (state === 'menu') { startGame(); return; }
-    if (state === 'gameover') { showMenu(); return; }
-    if (state !== 'playing') return;
-
-    jumpHeld = true;
-    const pw = THEME.player;
-    if (player.grounded) {
-      player.vy = pw.jumpForce;
-      player.grounded = false;
-      player.jumps = 1;
-      player.ducking = false;
-      player.state = 'jump';
-      setSquash(0.7, 1.3);
-      const pcfg = THEME.particles.dust;
-      ParticleEngine.dust(player.x + pw.width / 2, player.y + pw.height, 8, pcfg.colors, pcfg.size);
-      AudioEngine.jump();
-    } else if (player.jumps < player.maxJumps) {
-      player.vy = pw.jumpForce * 0.85;
-      player.jumps++;
-      player.state = 'jump';
-      setSquash(0.75, 1.25);
-      const jcfg = THEME.particles.jump;
-      ParticleEngine.ring(player.x + pw.width / 2, player.y + pw.height / 2, jcfg.colors[0], 30);
-      AudioEngine.doubleJump();
+    // Submit score and show game over
+    if (typeof Scoreboard !== 'undefined') {
+      Scoreboard.submitScore(theme.gameId, theme.name, theme.description || '', score).then((result) => {
+        ScoreboardUI.showGameOver(score, highScore, result);
+      });
     } else {
-      // Buffer jump for execution on landing
-      jumpBuffered = true;
-      jumpBufferTime = performance.now();
+      ScoreboardUI.showGameOver(score, highScore, null);
     }
   }
 
-  function onJumpRelease() { jumpHeld = false; }
+  // Input callbacks
+  function onJump() {
+    if (state === STATE.MENU) {
+      startGame();
+      return;
+    }
+    if (state === STATE.GAME_OVER) {
+      showMenu();
+      return;
+    }
+    if (state === STATE.PLAYING && isGrounded) {
+      playerVY = theme.player.jumpForce;
+      isJumping = true;
+      isGrounded = false;
+      playerState = 'jump';
+      AudioEngine.jump();
+      ParticleEngine.emit(playerX, playerY + theme.player.height, theme.colors.accent, 5, 'burst');
+    }
+  }
 
   function onDuck() {
-    if (state !== 'playing') return;
-    if (player.grounded) {
-      player.ducking = true;
-      player.state = 'duck';
+    if (state === STATE.PLAYING && isGrounded) {
+      isDucking = true;
+      playerState = 'duck';
     }
   }
 
   function onDuckRelease() {
-    player.ducking = false;
-    if (player.grounded && state === 'playing') player.state = 'run';
+    isDucking = false;
+    if (isGrounded && state === STATE.PLAYING) playerState = 'run';
   }
 
-  // --- Squash/Stretch ---
-  function setSquash(sx, sy) {
-    player.scaleX = sx; player.scaleY = sy;
-    player.targetScaleX = 1; player.targetScaleY = 1;
+  function onAction() {
+    if (state === STATE.MENU) startGame();
+    else if (state === STATE.GAME_OVER) showMenu();
   }
 
-  function updateSquash(dt) {
-    const lerp = 1 - Math.pow(0.001, dt);
-    player.scaleX += (player.targetScaleX - player.scaleX) * lerp;
-    player.scaleY += (player.targetScaleY - player.scaleY) * lerp;
-  }
+  // Main game loop
+  function gameLoop(timestamp) {
+    requestAnimationFrame(gameLoop);
 
-  // --- Collision ---
-  function checkCollision(obj) {
-    const pw = THEME.player.width;
-    const ph = player.ducking ? (THEME.player.duckHeight || THEME.player.height * 0.5) : THEME.player.height;
-    const py = player.ducking ? (player.y + THEME.player.height - ph) : player.y;
-    const pad = 4;
-    return (
-      player.x + pad < obj.x + obj.width - pad &&
-      player.x + pw - pad > obj.x + pad &&
-      py + pad < obj.y + obj.height - pad &&
-      py + ph - pad > obj.y + pad
+    if (state !== STATE.PLAYING) {
+      // Still render menu/game-over background
+      drawBackground(timestamp);
+      ParticleEngine.update(16);
+      ParticleEngine.draw();
+      return;
+    }
+
+    const dt = Math.min(timestamp - lastFrameTime, 50); // cap delta
+    lastFrameTime = timestamp;
+    elapsed = timestamp - gameStartTime;
+    frame++;
+    // Difficulty ramp
+    const elapsedSec = elapsed / 1000;
+    currentSpeed = Math.min(
+      theme.difficulty.startSpeed + elapsedSec * theme.difficulty.speedRampPerSecond,
+      theme.difficulty.maxSpeed
     );
+    currentSpawnInterval = Math.max(
+      theme.difficulty.startSpawnInterval + elapsedSec * theme.difficulty.spawnRampPerSecond,
+      theme.difficulty.minSpawnInterval
+    );
+
+    // Slow-mo effect
+    let speedMult = 1;
+    if (activeEffects['slow-mo']) speedMult = 0.5;
+
+    const effectiveSpeed = currentSpeed * speedMult;
+
+    // Update player physics
+    updatePlayer(dt);
+
+    // Spawn obstacles
+    if (timestamp - lastSpawnTime > currentSpawnInterval) {
+      spawnObstacle();
+      lastSpawnTime = timestamp;
+    }
+
+    // Spawn powerups
+    if (theme.powerups && theme.powerups.length > 0) {
+      for (const pu of theme.powerups) {
+        if (Math.random() < (pu.spawnChance || 0.01) * (dt / 16)) {
+          spawnPowerup(pu);
+        }
+      }
+    }
+
+    // Update obstacles
+    updateObstacles(effectiveSpeed, dt);
+
+    // Update powerups
+    updatePowerups(effectiveSpeed, dt);
+
+    // Update active effects
+    updateEffects(dt);
+
+    // Update score
+    const scoreMult = activeEffects['2x-score'] ? 2 : 1;
+    score += Math.round(theme.scoring.distancePointsPerFrame * comboMultiplier * scoreMult);
+    distance += effectiveSpeed;
+
+    // Combo decay
+    if (combo > 0 && timestamp - lastCollectTime > theme.scoring.comboDecayMs) {
+      combo = 0;
+      comboMultiplier = 1;
+    }
+
+    // Milestone
+    if (Math.floor(score / theme.scoring.milestoneInterval) > Math.floor((score - theme.scoring.distancePointsPerFrame * comboMultiplier * scoreMult) / theme.scoring.milestoneInterval)) {
+      AudioEngine.milestone();
+      ParticleEngine.sparkle(canvas.width / 2, canvas.height / 2, theme.colors.score, 20);
+    }
+
+    // Draw everything
+    draw(timestamp);
   }
 
-  function checkNearMiss(obs) {
-    const gap = obs.x - (player.x + THEME.player.width);
-    return gap > 0 && gap < 20 && !obs.nearMissed && !player.grounded;
+  function updatePlayer(dt) {
+    const dtMult = dt / 16; // normalize to ~60fps
+
+    // Gravity
+    if (!isGrounded) {
+      playerVY += theme.player.gravity * dtMult;
+      playerY += playerVY * dtMult;
+
+      // Ground collision
+      if (playerY >= theme.player.groundY) {
+        playerY = theme.player.groundY;
+        playerVY = 0;
+        isJumping = false;
+        isGrounded = true;
+        playerState = isDucking ? 'duck' : 'run';
+        ParticleEngine.emit(playerX + theme.player.width / 2, playerY + theme.player.height, theme.colors.accent, 3, 'dust');
+      }
+    }
   }
 
-  // --- Spawning ---
   function spawnObstacle() {
-    const pool = THEME.obstacles;
+    const pool = theme.obstacles;
     if (!pool || pool.length === 0) return;
+
+    // Weighted random selection
     const totalWeight = pool.reduce((s, o) => s + (o.weight || 1), 0);
     let r = Math.random() * totalWeight;
     let selected = pool[0];
@@ -281,278 +316,159 @@ const RunnerEngine = (() => {
       r -= (o.weight || 1);
       if (r <= 0) { selected = o; break; }
     }
-    const pw = THEME.player;
-    const groundBottom = pw.groundY + pw.height;
-    obstacles.push({
-      x: CW + 20,
+
+    const obs = {
+      ...selected,
+      x: canvas.width + 20,
       y: selected.type === 'air'
-        ? pw.groundY - 20 - selected.height
-        : groundBottom - selected.height,
-      width: selected.width,
-      height: selected.height,
-      type: selected.type,
-      drawFn: selected.draw,
-      name: selected.name,
-      scored: false,
-      nearMissed: false,
+        ? theme.player.groundY - 20 - selected.height  // air obstacles at head height
+        : theme.player.groundY + theme.player.height - selected.height,  // ground obstacles on ground
       active: true,
       frame: 0,
-    });
+    };
+    obstacles.push(obs);
   }
 
   function spawnPowerup(template) {
+    // Don't spawn too many
     if (powerups.length >= 3) return;
-    const pw = THEME.player;
-    powerups.push({
-      x: CW + 20,
-      y: pw.groundY - 30 - Math.random() * 60,
-      width: template.width || 20,
-      height: template.height || 20,
-      drawFn: template.draw,
-      name: template.name,
-      points: template.points || 100,
-      effect: template.effect,
-      duration: template.duration || 3000,
-      powerup: template,
+
+    const pu = {
+      ...template,
+      x: canvas.width + 20,
+      y: theme.player.groundY - 30 - Math.random() * 60,
       active: true,
       frame: 0,
-    });
+    };
+    powerups.push(pu);
   }
 
-  // --- Physics step (fixed timestep) ---
-  function physicsStep(dt) {
-    if (state === 'dying') {
-      dyingTimer -= dt;
-      deathFlashAlpha *= Math.pow(0.01, dt);
-      if (dyingTimer <= 0) goToGameOver();
-      return;
-    }
-    if (state !== 'playing') return;
-
-    gameTime += dt;
-    elapsed = (performance.now() - gameStartTime);
-
-    // Difficulty ramp
-    const diff = THEME.difficulty;
-    const elapsedSec = gameTime;
-    gameSpeed = Math.min(diff.maxSpeed, diff.startSpeed + diff.speedRampPerSecond * elapsedSec);
-    spawnInterval = Math.max(diff.minSpawnInterval, diff.startSpawnInterval + diff.spawnRampPerSecond * elapsedSec);
-
-    // Slow-mo effect
-    let speedMult = 1;
-    if (activeEffects['slow-mo']) speedMult = 0.5;
-    const effectiveSpeed = gameSpeed * speedMult;
-
-    distance += effectiveSpeed;
-
-    // Player physics
-    const pw = THEME.player;
-    if (!player.grounded) {
-      let gMult = 1;
-      if (player.vy < 0 && jumpHeld) gMult = 0.5;    // Hold = float
-      else if (player.vy > 0) gMult = 2.5;            // Release = fast fall
-      player.vy += pw.gravity * gMult;
-      player.y += player.vy;
-
-      if (player.y >= pw.groundY) {
-        player.y = pw.groundY;
-        if (player.vy > 2) {
-          setSquash(1.3, 0.7);
-          const dcfg = THEME.particles.dust;
-          ParticleEngine.dust(player.x + pw.width / 2, player.y + pw.height, 5, dcfg.colors, dcfg.size);
-          ParticleEngine.screenShake(2);
-          AudioEngine.land();
-        }
-        player.vy = 0;
-        player.grounded = true;
-        player.jumps = 0;
-        player.state = player.ducking ? 'duck' : 'run';
-        // Execute buffered jump
-        if (jumpBuffered && performance.now() - jumpBufferTime < JUMP_BUFFER_MS) {
-          jumpBuffered = false;
-          onJump();
-        } else {
-          jumpBuffered = false;
-        }
-      }
-    }
-
-    // Trail particles
-    if (Math.floor(gameTime * 20) !== Math.floor((gameTime - dt) * 20)) {
-      const tcfg = THEME.particles.trail;
-      ParticleEngine.trail(player.x, player.y + pw.height * 0.5, tcfg.colors, tcfg.size, effectiveSpeed * 50);
-    }
-
-    // Spawn obstacles (with warm-up grace period and spacing validation)
-    const now = performance.now();
-    if (now - lastSpawnTime >= spawnInterval && gameTime > 2) {
-      const minGap = effectiveSpeed * 30;
-      let canSpawn = true;
-      if (obstacles.length > 0) {
-        const last = obstacles[obstacles.length - 1];
-        if (CW + 20 - last.x < minGap) canSpawn = false;
-      }
-      if (canSpawn) {
-        lastSpawnTime = now;
-        spawnObstacle();
-      }
-    }
-
-    // Spawn powerups
-    if (THEME.powerups && THEME.powerups.length > 0) {
-      for (const pu of THEME.powerups) {
-        if (Math.random() < (pu.spawnChance || 0.003) * dt * 60) {
-          spawnPowerup(pu);
-        }
-      }
-    }
-
-    // Update obstacles
+  function updateObstacles(speed, dt) {
+    const dtMult = dt / 16;
     for (let i = obstacles.length - 1; i >= 0; i--) {
       const obs = obstacles[i];
-      obs.x -= effectiveSpeed;
+      obs.x -= speed * (obs.minSpeed || 1) * dtMult;
       obs.frame++;
 
-      if (obs.x + obs.width < -20) { obstacles.splice(i, 1); continue; }
-
-      if (!obs.scored && obs.x + obs.width < player.x) { obs.scored = true; }
-
-      // Near miss
-      if (checkNearMiss(obs) && obs.active) {
-        obs.nearMissed = true;
-        score += 25;
-        FloatingText.add(player.x + pw.width + 30, player.y - 10, 'CLOSE!', '#00FF88', 22);
-        ParticleEngine.screenShake(3);
-        AudioEngine.nearMiss();
+      // Off screen
+      if (obs.x + obs.width < -20) {
+        obstacles.splice(i, 1);
+        continue;
       }
 
-      // Collision
+      // Collision detection (AABB)
       if (obs.active && checkCollision(obs)) {
         if (activeEffects['shield'] || activeEffects['invincible']) {
+          // Protected — destroy obstacle
           obs.active = false;
-          const ccfg = THEME.particles.collect;
-          ParticleEngine.sparkle(obs.x + obs.width / 2, obs.y + obs.height / 2, ccfg.colors, ccfg.size, 10);
+          ParticleEngine.explosion(obs.x + obs.width / 2, obs.y + obs.height / 2, theme.colors.accent, 10);
           AudioEngine.collect();
           score += 50;
-          if (activeEffects['shield']) delete activeEffects['shield'];
+          if (activeEffects['shield']) {
+            delete activeEffects['shield']; // shield is one-hit
+          }
         } else {
-          die();
+          gameOver();
           return;
         }
       }
     }
+  }
 
-    // Update powerups
+  function updatePowerups(speed, dt) {
+    const dtMult = dt / 16;
     const magnetActive = !!activeEffects['magnet'];
+
     for (let i = powerups.length - 1; i >= 0; i--) {
       const pu = powerups[i];
-      pu.x -= effectiveSpeed;
+      pu.x -= speed * dtMult;
       pu.frame++;
 
+      // Magnet attraction
       if (magnetActive) {
-        const dx = player.x - pu.x;
-        const dy = player.y - pu.y;
+        const dx = playerX - pu.x;
+        const dy = playerY - pu.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < 200) {
-          pu.x += (dx / dist) * 5;
-          pu.y += (dy / dist) * 5;
+          pu.x += (dx / dist) * 5 * dtMult;
+          pu.y += (dy / dist) * 5 * dtMult;
         }
       }
 
-      if (pu.x + pu.width < -20) { powerups.splice(i, 1); continue; }
+      // Off screen
+      if (pu.x + pu.width < -20) {
+        powerups.splice(i, 1);
+        continue;
+      }
 
+      // Collection
       if (pu.active && checkCollision(pu)) {
         pu.active = false;
         powerups.splice(i, 1);
         activatePowerup(pu);
       }
     }
-
-    // Update active effects
-    for (const key of Object.keys(activeEffects)) {
-      activeEffects[key].remaining -= dt * 1000;
-      if (activeEffects[key].remaining <= 0) delete activeEffects[key];
-    }
-
-    // Score
-    const scoreMult = activeEffects['2x-score'] ? 2 : 1;
-    score += THEME.scoring.distancePointsPerFrame * comboMultiplier * scoreMult * dt * 60;
-
-    // Combo decay
-    if (combo > 0 && now - lastCollectTime > THEME.scoring.comboDecayMs) {
-      combo = 0;
-      comboMultiplier = 1;
-    }
-
-    // Milestones
-    const newMilestone = Math.floor(score / THEME.scoring.milestoneInterval);
-    if (newMilestone > prevMilestone) {
-      prevMilestone = newMilestone;
-      const s = Math.floor(score);
-      if (s % 1000 === 0 && s > 0) {
-        AudioEngine.score1000();
-        const ccfg = THEME.particles.confetti;
-        ParticleEngine.confetti(CW / 2, CH / 3, ccfg.colors, ccfg.size, 30);
-        FloatingText.add(CW / 2, CH / 3, s + '!', THEME.colors.score, 36);
-        ParticleEngine.screenShake(4);
-      } else {
-        AudioEngine.score100();
-        FloatingText.add(player.x + pw.width + 20, player.y, String(s), THEME.colors.score, 20);
-      }
-    }
-
-    updateSquash(dt);
   }
 
   function activatePowerup(pu) {
     AudioEngine.collect();
-    const ccfg = THEME.particles.collect;
-    ParticleEngine.sparkle(pu.x + pu.width / 2, pu.y + pu.height / 2, ccfg.colors, ccfg.size, 15);
+    ParticleEngine.sparkle(pu.x + pu.width / 2, pu.y + pu.height / 2, theme.colors.score, 15);
     score += pu.points || 100;
 
+    // Combo
     combo++;
     lastCollectTime = performance.now();
-    comboMultiplier = Math.min(1 + combo * 0.5, THEME.scoring.comboMultiplierMax);
+    comboMultiplier = Math.min(1 + combo * 0.5, theme.scoring.comboMultiplierMax);
 
+    // Activate effect
     if (pu.effect) {
-      activeEffects[pu.effect] = { remaining: pu.duration || 3000, powerup: pu };
+      activeEffects[pu.effect] = {
+        remaining: pu.duration || 3000,
+        powerup: pu,
+      };
     }
 
     HUD.flashCombo(combo, comboMultiplier);
   }
 
-  // --- Render ---
-  function render() {
-    const shake = ParticleEngine.getShake();
-
-    // Clear
-    ctx.fillStyle = THEME.colors.bg;
-    ctx.fillRect(0, 0, CW, CH);
-
-    ctx.save();
-    ctx.translate(shake.x, shake.y);
-
-    // Backgrounds (parallax)
-    if (THEME.backgrounds) {
-      const offset = state === 'playing' || state === 'dying' ? distance : performance.now() * 0.02;
-      for (const bg of THEME.backgrounds) {
-        ctx.save();
-        try { bg.draw(ctx, Math.floor(offset * bg.speed), CW, CH); } catch(e) {}
-        ctx.restore();
+  function updateEffects(dt) {
+    for (const key of Object.keys(activeEffects)) {
+      activeEffects[key].remaining -= dt;
+      if (activeEffects[key].remaining <= 0) {
+        delete activeEffects[key];
       }
     }
+  }
 
-    // Ground
-    const groundY = THEME.player.groundY + THEME.player.height;
-    ctx.save();
-    try { THEME.drawGround(ctx, Math.floor(distance), groundY, CW, CH - groundY); } catch(e) {}
-    ctx.restore();
+  function checkCollision(obj) {
+    const pw = theme.player.width;
+    const ph = isDucking ? (theme.player.duckHeight || theme.player.height * 0.5) : theme.player.height;
+    const py = isDucking ? (playerY + theme.player.height - ph) : playerY;
+
+    // AABB collision with slight padding for fairness
+    const pad = 4;
+    return (
+      playerX + pad < obj.x + obj.width - pad &&
+      playerX + pw - pad > obj.x + pad &&
+      py + pad < obj.y + obj.height - pad &&
+      py + ph - pad > obj.y + pad
+    );
+  }
+
+  // Drawing
+  function draw(timestamp) {
+    // Clear
+    ctx.fillStyle = theme.colors.bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Backgrounds (parallax)
+    drawBackground(timestamp);
 
     // Obstacles
     for (const obs of obstacles) {
       if (!obs.active) continue;
       ctx.save();
-      try { obs.drawFn(ctx, Math.floor(obs.x), Math.floor(obs.y), obs.frame); } catch(e) {}
+      obs.draw(ctx, obs.x, obs.y, obs.frame);
       ctx.restore();
     }
 
@@ -560,87 +476,39 @@ const RunnerEngine = (() => {
     for (const pu of powerups) {
       if (!pu.active) continue;
       ctx.save();
-      try { pu.drawFn(ctx, Math.floor(pu.x), Math.floor(pu.y), pu.frame); } catch(e) {}
+      pu.draw(ctx, pu.x, pu.y, pu.frame);
       ctx.restore();
     }
-
-    // Particles (behind player)
-    ParticleEngine.draw(0);
 
     // Player
-    if (state !== 'gameover') {
+    ctx.save();
+    // Flash when shielded/invincible
+    if (activeEffects['shield'] || activeEffects['invincible']) {
+      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(frame * 0.3);
+    }
+    const ph = isDucking ? (theme.player.duckHeight || theme.player.height * 0.5) : theme.player.height;
+    const py = isDucking ? (playerY + theme.player.height - ph) : playerY;
+    theme.player.draw(ctx, playerX, py, frame, playerState);
+    ctx.restore();
+
+    // Particles
+    ParticleEngine.update(16);
+    ParticleEngine.draw();
+
+    // HUD
+    HUD.draw(score, highScore, combo, comboMultiplier, activeEffects, elapsed);
+  }
+
+  function drawBackground(timestamp) {
+    if (!theme || !theme.backgrounds) return;
+    const t = timestamp || performance.now();
+    const offset = state === STATE.PLAYING ? distance : t * 0.02;
+    for (const bg of theme.backgrounds) {
       ctx.save();
-      const pw = THEME.player;
-      const ph = player.ducking ? (pw.duckHeight || pw.height * 0.5) : pw.height;
-      const py = player.ducking ? (player.y + pw.height - ph) : player.y;
-      const cx = player.x + pw.width / 2;
-      const cy = py + ph;
-      ctx.translate(cx, cy);
-      ctx.scale(player.scaleX, player.scaleY);
-      ctx.translate(-cx, -cy);
-      // Flash when shielded/invincible
-      if (activeEffects['shield'] || activeEffects['invincible']) {
-        ctx.globalAlpha = 0.6 + 0.4 * Math.sin(gameTime * 15);
-      }
-      try { pw.draw(ctx, player.x, Math.floor(py), Math.floor(gameTime * 60), player.state); } catch(e) {}
+      bg.draw(ctx, offset * bg.speed, canvas.width, canvas.height);
       ctx.restore();
     }
-
-    // Particles (in front)
-    ParticleEngine.draw(1);
-
-    // Speed lines
-    SpeedLines.draw();
-
-    // Floating text
-    FloatingText.draw();
-
-    // Death flash
-    if (deathFlashAlpha > 0.01) {
-      ctx.fillStyle = 'rgba(255,255,255,' + deathFlashAlpha.toFixed(2) + ')';
-      ctx.fillRect(-20, -20, CW + 40, CH + 40);
-    }
-
-    ctx.restore(); // Remove shake
-
-    // HUD (not affected by shake)
-    if (state === 'playing' || state === 'dying') {
-      HUD.draw(score, highScore, combo, comboMultiplier, activeEffects, elapsed);
-    }
   }
 
-  // --- Game Loop ---
-  function gameLoop(timestamp) {
-    requestAnimationFrame(gameLoop);
-
-    const rawDt = (timestamp - lastFrameTime) / 1000;
-    lastFrameTime = timestamp;
-    const dt = Math.min(rawDt, 0.1);
-
-    // Hit freeze
-    if (hitFreezeFrames > 0) {
-      hitFreezeFrames--;
-      render();
-      return;
-    }
-
-    // Fixed timestep physics
-    accumulator += dt;
-    while (accumulator >= PHYSICS_DT) {
-      physicsStep(PHYSICS_DT);
-      accumulator -= PHYSICS_DT;
-    }
-
-    // Variable-rate updates
-    ParticleEngine.update(dt);
-    FloatingText.update(dt);
-    SpeedLines.update(dt, gameSpeed, state, THEME.player.groundY, CW);
-
-    render();
-  }
-
-  return { start };
+  return { start, getState: () => state, getScore: () => score };
 })();
-
-// --- Boot ---
-RunnerEngine.start();

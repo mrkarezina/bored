@@ -11,11 +11,7 @@ Try games made with /bored at **[bored.run](https://bored.run)**
 In Claude Code:
 
 ```
-/plugin marketplace add mrkarezina/bored
-```
-
-```
-/plugin install bored@bored-games
+/install-plugin bored@bored-games
 ```
 
 ## Usage
@@ -30,8 +26,6 @@ Claude invents a theme, draws all the sprites, writes the sounds, and outputs a 
 
 ### Request a specific theme
 
-Pass a description after the command to guide the theme:
-
 ```
 /bored cats in space
 ```
@@ -42,51 +36,40 @@ Pass a description after the command to guide the theme:
 
 Claude interprets your idea creatively — "cats in space" might become "Cosmic Kittens" with astronaut cats dodging asteroids.
 
-### Default behavior
-
-With no description, Claude invents a theme from scratch — something fun and unexpected like "Kitchen Chaos", "Neon Drift", or "Rooftop Run".
-
 ## What You Get
 
 Every generated game includes:
 
 - **Canvas 2D graphics** — character, obstacles, parallax backgrounds, all drawn with code
-- **Physics** — variable-height jumps, double jump, ducking, fixed-timestep simulation
-- **Power-ups** — shield, invincibility, 2x score, slow-mo, magnet — with a combo multiplier system
-- **Procedural audio** — jump chirps, death sounds, collect jingles, and background music — all synthesized with Web Audio API
-- **Particles** — dust, rings, explosions, sparkles, confetti, speed lines — object-pooled for zero GC
-- **Game juice** — screen shake, squash & stretch, hit freeze, near-miss detection, floating text
+- **Physics** — jumps, ducking, difficulty ramp
+- **Power-ups** — shield, invincibility, 2x score, slow-mo, magnet with combo multiplier
+- **Procedural audio** — jump chirps, collect jingles, death sounds, background beat
+- **Particles** — dust, explosions, sparkles, trails, screen shake
 - **Score tracking** — play count and all-time high tracked at [bored.run](https://bored.run)
-- **Polished UI** — CSS menu overlay with backdrop blur, game-over screen with stats
-
-Every game has a unique theme with matching visuals, sounds, and obstacles.
+- **Polished UI** — menu overlay, game-over screen with animated stats
 
 ## Sharing
 
-After generating a game, share it with anyone:
+After generating a game, share it:
 
 ```
 /bored-share
 ```
 
-This uploads your game to [bored.run](https://bored.run) and gives you a link like:
+Uploads your game to [bored.run](https://bored.run) and gives you a link:
 
 ```
 https://www.bored.run/play/<gameId>
 ```
 
-Playable in any browser — no install needed. Send the link to friends and compete for the all-time high.
+Playable in any browser. Send the link to friends and compete for the all-time high.
 
 ## How It Works
 
 The plugin has two parts:
 
-1. **Engine template** — ~1800 lines of JavaScript organized as modular IIFEs (AudioEngine, ParticleEngine, InputHandler, HUD, ScoreboardClient, RunnerEngine, etc.) on a fixed 800x400 canvas. This code is the same for every game.
+1. **Engine modules** — pre-built JavaScript (AudioEngine, ParticleEngine, InputHandler, HUD, Scoreboard, RunnerEngine) that handle all game logic on a fixed 800x400 canvas.
 
-2. **THEME object** — the only part that changes per game. Contains all the visuals (`draw()` functions using Canvas 2D), obstacle definitions, power-up configs, parallax layers, color palette, difficulty curve, and sound settings. Claude fills this in based on the theme it invents.
+2. **THEME object** — the creative part that changes per game. Contains all visuals (`draw()` functions using Canvas 2D), obstacles, power-ups, parallax layers, colors, difficulty, and sounds. Claude writes this fresh each time.
 
-The engine handles physics, rendering, particles, audio, input, scoring, combos, and leaderboard integration. Claude only needs to be creative with the THEME.
-
-## Reference Docs
-
-- [`skills/runner-engine/references/theming-guide.md`](skills/runner-engine/references/theming-guide.md) — THEME object API & creative direction
+Claude assembles both parts into a single `index.html` and opens it.
