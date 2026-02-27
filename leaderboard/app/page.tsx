@@ -139,7 +139,7 @@ export default async function Home() {
                   <CopyButton text="/bored:share" />
                 </div>
                 <p className="text-xs text-neutral-500 font-mono leading-relaxed">
-                  Upload your game and get a shareable link.
+                  Create a shareable link for your game.
                 </p>
                 <div className="mt-3 bg-neutral-950/80 rounded-lg border border-neutral-800/30 px-3 py-2">
                   <code className="text-xs font-mono text-neutral-500">
