@@ -12,6 +12,9 @@ In Claude Code:
 
 ```
 /plugin marketplace add mrkarezina/bored
+```
+
+```
 /plugin install bored@bored-games
 ```
 
