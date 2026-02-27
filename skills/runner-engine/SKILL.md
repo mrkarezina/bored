@@ -43,15 +43,32 @@ Each engine module is a self-contained IIFE communicating via globals (e.g., Run
 
 ## Engine Features
 
-- Variable delta-time physics with frame cap
-- State machine: menu → playing → game over
+- Variable delta-time physics with frame cap (50ms max)
+- State machine: menu → playing → dying → game over
+- **Variable jump height**: hold for full arc, release early for short hop
+- **Enhanced gravity**: 2x fall speed, 1.8x on early release, 0.5x hang time at apex
+- **Squash & stretch**: landing squash + jump stretch with lerp back
+- **Coyote time**: 100ms grace period for late jumps
+- **Input buffering**: 100ms queued jump before landing
+- **Hit freeze**: 100ms pause on death for dramatic impact
+- **Background flash**: white overlay on death
+- **Death momentum**: player tumbles upward then falls before game-over
+- **Near-miss detection**: "CLOSE!" bonus when dodging within 12px
+- **Speed lines**: horizontal streaks at high velocity
+- **Running dust trail**: particles while running on ground
+- **Floating text popups**: animated score/near-miss text
+- **Logarithmic difficulty curve**: exciting early ramp, fair plateau
+- **Minimum obstacle gap**: 400ms between spawns
+- **Score lerp**: smooth count-up display in HUD
+- **Tab visibility handling**: pauses and resets timing on tab switch
+- **Canvas alpha:false**: free performance optimization
 - Jump (Space/Up/W, tap) + duck (Down/S, swipe down) mechanics
 - Power-up system: shield, invincible, 2x-score, slow-mo, magnet
-- Combo system: consecutive pickups increase multiplier up to configurable max
-- Weighted obstacle spawning with difficulty ramp
-- Particle effects: dust, bursts, explosions, sparkles, trails
+- Combo system with rising pitch audio on consecutive pickups
+- Weighted obstacle spawning with air obstacle "duck clearance zone"
+- Particle effects: dust, bursts, explosions, sparkles, trails, speed lines
 - Screen shake on death
-- Procedural Web Audio sounds + background beat
+- Procedural Web Audio sounds + background beat + near-miss whoosh
 - HUD: score, high score, combo counter, effect timers, elapsed time
 - DOM-based UI: menu overlay with backdrop blur, game-over with animated stats
 - Full input: keyboard, touch (tap/swipe), mouse click

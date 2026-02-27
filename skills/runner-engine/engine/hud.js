@@ -7,6 +7,7 @@ const HUD = (() => {
   let theme = null;
   let comboFlash = 0;
   let comboFlashText = '';
+  let displayScore = 0;
 
   function init(context, themeConfig) {
     ctx = context;
@@ -17,13 +18,17 @@ const HUD = (() => {
     if (!ctx || !theme) return;
     const w = ctx.canvas.width;
 
+    // Score lerp — smooth count-up
+    displayScore += (score - displayScore) * 0.1;
+    if (Math.abs(displayScore - score) < 1) displayScore = score;
+
     // Score (top right)
     ctx.save();
     ctx.fillStyle = theme.colors.score;
     ctx.font = 'bold 28px monospace';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    const scoreText = String(Math.floor(score)).padStart(6, '0');
+    const scoreText = String(Math.floor(displayScore)).padStart(6, '0');
     ctx.fillText(scoreText, w - 16, 16);
 
     // High score (smaller, below score)
@@ -110,5 +115,10 @@ const HUD = (() => {
     }
   }
 
-  return { init, draw, flashCombo };
+  function reset() {
+    displayScore = 0;
+    comboFlash = 0;
+  }
+
+  return { init, draw, flashCombo, reset };
 })();

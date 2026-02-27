@@ -81,6 +81,21 @@ const ParticleEngine = (() => {
     });
   }
 
+  function speedLine(w, h) {
+    particles.push({
+      x: w,
+      y: 20 + Math.random() * (h - 40),
+      color: 'rgba(255,255,255,0.3)',
+      vx: -(15 + Math.random() * 10),
+      vy: 0,
+      life: 1.0,
+      decay: 0.04 + Math.random() * 0.02,
+      size: 1,
+      type: 'speedline',
+      length: 30 + Math.random() * 50,
+    });
+  }
+
   function screenShake(intensity, duration) {
     shakeIntensity = intensity;
     shakeDuration = duration;
@@ -122,19 +137,25 @@ const ParticleEngine = (() => {
     }
   }
 
+  function getShakeOffset() {
+    return { x: shakeX, y: shakeY };
+  }
+
   function draw() {
     if (!ctx) return;
-
-    // Apply screen shake
-    if (shakeX !== 0 || shakeY !== 0) {
-      ctx.save();
-      ctx.translate(shakeX, shakeY);
-    }
 
     for (const p of particles) {
       ctx.globalAlpha = p.life;
       ctx.fillStyle = p.color;
-      if (p.type === 'sparkle') {
+      if (p.type === 'speedline') {
+        // Horizontal streak
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.size;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x + (p.length || 40) * p.life, p.y);
+        ctx.stroke();
+      } else if (p.type === 'sparkle') {
         // Star shape
         ctx.save();
         ctx.translate(p.x, p.y);
@@ -149,11 +170,7 @@ const ParticleEngine = (() => {
       }
     }
     ctx.globalAlpha = 1;
-
-    if (shakeX !== 0 || shakeY !== 0) {
-      ctx.restore();
-    }
   }
 
-  return { init, emit, explosion, sparkle, trail, screenShake, update, draw };
+  return { init, emit, explosion, sparkle, trail, speedLine, screenShake, getShakeOffset, update, draw };
 })();

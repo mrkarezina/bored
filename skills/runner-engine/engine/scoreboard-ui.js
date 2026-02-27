@@ -31,9 +31,9 @@ const ScoreboardUI = (() => {
       countUp();
     }
 
-    if (hsEl) hsEl.textContent = 'Best: ' + Math.floor(highScore).toLocaleString();
-
-    const isPersonalBest = score >= highScore && score > 0;
+    const isPersonalBest = score > 0 && score > highScore;
+    const displayBest = isPersonalBest ? score : highScore;
+    if (hsEl) hsEl.textContent = 'Best: ' + Math.floor(displayBest).toLocaleString();
     const isWorldRecord = apiResult && apiResult.isNewRecord;
 
     if (newRecordEl) newRecordEl.style.display = isPersonalBest && !isWorldRecord ? 'block' : 'none';

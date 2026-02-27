@@ -58,12 +58,32 @@ const AudioEngine = (() => {
     osc.stop(audioCtx.currentTime + 0.2);
   }
 
-  function collect() {
+  function collect(combo) {
     if (!ensureCtx()) return;
     const freqs = config.collectFreqs || [523, 659, 784];
+    // Rising pitch for combo streaks (semitone per consecutive pickup)
+    const pitchMult = combo ? Math.pow(1.0595, Math.min(combo, 12)) : 1;
+    // Random pitch variation (+/- 15%) for organic feel
+    const variation = 0.85 + Math.random() * 0.3;
     freqs.forEach((f, i) => {
-      setTimeout(() => playTone(f, 0.15, 'sine', 0.12), i * 60);
+      setTimeout(() => playTone(f * pitchMult * variation, 0.15, 'sine', 0.12), i * 60);
     });
+  }
+
+  function nearMiss() {
+    if (!ensureCtx()) return;
+    // Quick ascending whoosh
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.15);
   }
 
   function hit() {
@@ -122,5 +142,5 @@ const AudioEngine = (() => {
     }
   }
 
-  return { init, jump, collect, hit, milestone, bgBeat };
+  return { init, jump, collect, hit, nearMiss, milestone, bgBeat };
 })();
