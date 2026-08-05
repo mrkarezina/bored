@@ -7,3 +7,7 @@ node_modules/
 
 # Supabase CLI local state
 **/supabase/.temp/
+
+# Generated games
+/index.html
+/theme.js
