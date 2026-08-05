@@ -70,6 +70,12 @@ https://bored-claude.vercel.app/play/<gameId>
 
 Playable in any browser. Send the link to friends and compete for the all-time high.
 
+## Tweaking a Game
+
+Ask for changes in plain English — "the jump feels floaty", "make the obstacles easier to tell
+apart", "this is too hard". Claude edits `theme.js` and rebuilds. The `gameId` survives a rebuild,
+so the scoreboard keeps counting.
+
 ## How It Works
 
 The plugin has two parts:
@@ -78,4 +84,18 @@ The plugin has two parts:
 
 2. **THEME object** — the creative part that changes per game. Contains all visuals (`draw()` functions using Canvas 2D), obstacles, power-ups, parallax layers, colors, difficulty, and sounds. Claude writes this fresh each time.
 
-Claude assembles both parts into a single `index.html` and opens it.
+Claude writes only the theme, to `theme.js`. Two scripts do the rest:
+
+```
+node skills/bored/scripts/validate.js theme.js   # lint the theme against the engine contract
+node skills/bored/scripts/build.js theme.js      # splice theme + engine into index.html
+```
+
+The engine source never passes through the model, so it can't be mistyped, and `validate.js`
+catches the failure modes that actually break games — sprites that strobe, air obstacles too tall
+to duck under, power-up effects that silently do nothing.
+
+`theme.js` is the source of truth; `index.html` is a build artifact you can regenerate at any time.
+
+**Requires Node** (18+, for `crypto.randomUUID`) when generating a game. The generated game itself
+has no dependencies at all.
