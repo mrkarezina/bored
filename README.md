@@ -78,24 +78,50 @@ so the scoreboard keeps counting.
 
 ## How It Works
 
-The plugin has two parts:
+Games are composed from a **tested block library**, not written from scratch. The split is
+deliberate:
 
-1. **Engine modules** — pre-built JavaScript (AudioEngine, ParticleEngine, InputHandler, HUD, Scoreboard, ScoreboardUI, RunnerEngine) that handle all game logic on a fixed 800x400 canvas.
+> **Blocks where correctness matters. Freedom where identity lives.**
 
-2. **THEME object** — the creative part that changes per game. Contains all visuals (`draw()` functions using Canvas 2D), obstacles, power-ups, parallax layers, colors, difficulty, and sounds. Claude writes this fresh each time.
+A bad sprite is only ugly, so drawing is left wide open — that's where "cats in space" stops being a
+reskin. A bad spawner is unplayable, so spacing, colour and sound are blocks.
 
-Claude writes only the theme, to `theme.js`. Two scripts do the rest:
+**The library** (`skills/bored/lib/`) — patterns, a rhythm scheduler, bounded motion, contrast-solved
+palettes, curated ZzFX sound sets. Every piece is tested against the full range of physics and speed
+a theme can ask for, and composes safely in any combination.
+
+**The engine** (`skills/bored/engine/`) — game loop, fixed-60Hz physics, collision, particles, HUD,
+scoreboard. Never passes through the model, so it can't be mistyped.
+
+**The theme** — the only file Claude writes. Sprites, obstacle shapes, and a playlist of patterns.
 
 ```
-node skills/bored/scripts/validate.js theme.js   # lint the theme against the engine contract
-node skills/bored/scripts/build.js theme.js      # splice theme + engine into index.html
+node skills/bored/scripts/validate.js theme.js   # lint against the contract
+node skills/bored/scripts/build.js theme.js      # splice library + theme + engine into index.html
+node skills/bored/scripts/playtest.js index.html # optional: play it 100s of times, report on fun
 ```
 
-The engine source never passes through the model, so it can't be mistyped, and `validate.js`
-catches the failure modes that actually break games — sprites that strobe, air obstacles too tall
-to duck under, power-up effects that silently do nothing.
+### Why it's built this way
+
+The old spawner fired on a fixed interval and picked an obstacle at weighted random. But a jump
+lasts 37 frames, and you're above a 40px obstacle for 30 of them — so two obstacles are survivable
+only if they're close enough to clear in one arc, or far enough apart to land between. **Between
+those is a band with no answer at all**, and at maximum speed 47% of the gaps that spawner produced
+landed in it. That is the "it gets unfair when it speeds up" complaint, and no amount of tuning the
+interval fixes it.
+
+Patterns are pre-solved clusters that live entirely in one survivable regime, and the scheduler
+spaces them more than a full jump apart. So the unfair case isn't caught — it's **unrepresentable**.
+The same trick applies to muddy palettes and unreachable power-ups.
+
+That moves testing off every generated game and onto the parts:
+
+```
+npm test    # 44 tests, including 500 randomly composed games
+```
 
 `theme.js` is the source of truth; `index.html` is a build artifact you can regenerate at any time.
 
-**Requires Node** (18+, for `crypto.randomUUID`) when generating a game. The generated game itself
-has no dependencies at all.
+**Requires Node 18+** when generating a game. The generated game itself has no dependencies at all —
+it's one self-contained HTML file, [ZzFX](https://github.com/KilledByAPixel/ZzFX) (MIT, Frank Force)
+and all.

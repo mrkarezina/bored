@@ -1,7 +1,8 @@
 # THEME API
 
-The mechanical contract between a theme and the engine. For creative direction — what to
-build and why — see [design-guide.md](design-guide.md).
+The mechanical contract between a theme and the engine — the parts that are not blocks. For the
+block vocabulary see [blocks.md](blocks.md); for why any of it is shaped this way, see
+[fundamentals.md](fundamentals.md).
 
 A theme file declares exactly one top-level binding:
 
@@ -9,55 +10,58 @@ A theme file declares exactly one top-level binding:
 const THEME = { /* ... */ };
 ```
 
-`scripts/build.js` evaluates that file, so it must be plain JavaScript with no imports and no
-browser globals at the top level. Drawing code runs inside a canvas context at runtime, which is
-the only place `ctx` exists.
+`scripts/build.js` evaluates that file with the block library already in scope, so it must be plain
+JavaScript with no imports and no browser globals at the top level. A theme is **not inert data** —
+`Pattern.cluster(...)` and `Palette.dusk(...)` run as the object is built. `ctx` exists only inside a
+`draw()`, at runtime.
 
 ## Structure
 
 ```js
+const PALETTE = Palette.dusk('#2b1b3d', { accent: '#ff9f43', obstacles: 4 });
+
 const THEME = {
   name: 'Game Title',
   description: 'One-line hook',       // menu subtitle
   gameId: 'GENERATED',                // build.js replaces this with a real UUID
 
-  colors: {
-    bg,          // page + canvas background (dark reads best)
-    text,        // UI text
-    accent,      // UI accent, particles, highlights
-    score,       // score number (bright, high contrast)
-    ground,      // ground fill
-    groundLine,  // ground detail line
-  },
+  colors: PALETTE,                    // needs bg, text, accent, score, ground, groundLine
 
   player: {
-    width: 32, height: 48,   // standing hitbox
+    width: 34, height: 44,   // standing hitbox
     duckHeight: 24,          // ducking hitbox, must be < height
-    groundY: 300,            // Y of the hitbox top when standing on the ground
-    jumpForce: -14,          // launch velocity, negative is up (range -10 to -18)
-    gravity: 0.8,            // per-frame gravity (range 0.5 to 1.2)
+    groundY: 296,            // Y of the hitbox top when standing on the ground
+    jumpForce: -12.5,        // launch velocity, negative is up (-10 to -16)
+    gravity: 0.65,           // per-frame gravity (0.45 to 1.05)
     draw(ctx, x, y, frame, state) {
       // state: 'run' | 'jump' | 'duck' | 'hit'
-      // Draw inside the x, y, width, height box.
     },
   },
 
   obstacles: [
-    { name, type: 'ground' | 'air', width, height, weight, draw(ctx, x, y, frame) {} },
+    {
+      name: 'AC unit',              // patterns refer to obstacles by name
+      type: 'ground' | 'air',
+      width: 40, height: 38,        // this IS the hitbox — draw inside it
+      motion: [Motion.bob(6, 900)], // optional
+      draw(ctx, x, y, frame) {},
+    },
   ],
+
+  rhythm: Rhythm.playlist([ /* see blocks.md */ ]),
 
   powerups: [
     {
-      name, width: 20, height: 20, points: 100,
+      name: 'catnip', width: 22, height: 22, points: 100,
       effect: 'shield' | 'invincible' | '2x-score' | 'slow-mo' | 'magnet',
-      duration: 5000,        // ms; ignored for 'shield', which lasts until it absorbs a hit
-      spawnChance: 0.003,    // per-frame roll, 0.001-0.005
+      duration: 5000,               // ms; ignored for 'shield', which lasts until it absorbs a hit
+      frequency: 'rare' | 'common',
       draw(ctx, x, y, frame) {},
     },
   ],
 
   backgrounds: [
-    { speed: 0.15, draw(ctx, scrollX, canvasWidth, canvasHeight) {} },
+    { speed: 0.18, draw(ctx, scrollX, canvasWidth, canvasHeight) {} },
   ],
 
   drawGround(ctx, scrollX, groundY, w, h) {
@@ -81,94 +85,60 @@ const THEME = {
   },
 
   difficulty: {
-    startSpeed: 4,             // 3-6
-    maxSpeed: 12,              // 10-16
+    startSpeed: 4,             // px per frame, 3-6
+    maxSpeed: 11,              // 9-14
     speedRampPerSecond: 0.05,  // 0.03-0.08
-    startSpawnInterval: 1500,  // ms, 1200-2000
-    minSpawnInterval: 600,     // ms, 400-800
-    spawnRampPerSecond: -8,
   },
 
-  sounds: {
-    jumpFreqs: [200, 500],           // [startHz, endHz]; ascending = cheerful
-    collectFreqs: [523, 659, 784],   // arpeggio
-    hitFreq: 80,                     // 60-120, a thud
-    bgBPM: 120,                      // 100-140
-  },
+  sounds: Sound.chiptune(),
 };
 ```
 
+There are no spawn intervals, obstacle weights, or per-frame power-up probabilities. How often
+something appears is set by its patterns' weights in `THEME.rhythm`; where it appears is the
+scheduler's job.
+
 ## Obstacle placement
 
-The engine positions obstacles for you — a theme only supplies dimensions.
+The engine positions obstacles — a theme only supplies dimensions and a lane.
 
-- **Ground** obstacles sit on the ground line: `y = player.groundY + player.height - height`.
-  The player must jump them.
-- **Air** obstacles are centred in the clearance band between the standing and ducking hitbox
-  tops. The player must duck under them.
+- **Ground** obstacles sit on the ground line. The player jumps them. Must be under ~90% of the jump
+  apex or nothing clears them; the engine refuses to start otherwise.
+- **Air** obstacles are centred in the clearance band between the standing and ducking hitbox tops.
+  The player ducks under them.
 
-Collision is AABB with 4px of padding per side, in the player's favour. That makes the duckable
+Collision is AABB with 4px of padding per side, in the player's favour, which makes the duckable
 window:
 
 ```
-air obstacle height <= (player.height - player.duckHeight) + 16
+air obstacle height + 2 x (motion dy bound)  <=  (player.height - player.duckHeight) + 16
 ```
 
-Exceed it and a ducking player still gets hit, which reads as a broken game.
-`scripts/validate.js` checks this.
+Motion counts against that budget — `bob(8)` on a bird that only just fits makes it stop fitting. The
+engine checks this at boot and `validate.js` checks it at build time, both with the motion included.
 
 ## Drawing rules
 
 Canvas primitives only — `fillRect`, `strokeRect`, `beginPath`/`arc`/`fill`/`stroke`,
-`moveTo`/`lineTo`/`closePath`. No `Image()`, no `fetch()`, no external URLs. Games must stay
-self-contained in one file.
+`moveTo`/`lineTo`/`closePath`, `ellipse`, `quadraticCurveTo`. No `Image()`, no `fetch()`, no external
+URLs: games must stay self-contained in one file.
 
 Never call these inside a `draw()`:
 
 | Banned | Why |
 |---|---|
-| `Math.random()` | Re-randomising geometry every frame makes sprites strobe. Derive variation from `frame` or from a value fixed at spawn. |
-| `shadowBlur` | Re-rasterises every frame and flickers at speed. |
-| `createLinearGradient` / `createRadialGradient` | Per-frame allocation churn. Build gradients once outside `draw()`. |
-| `getImageData` | Forces a pipeline stall every frame. |
+| `Math.random()` | re-randomising geometry every frame makes sprites strobe — derive variation from `frame` |
+| `shadowBlur` | re-rasterises every frame and flickers at speed |
+| `createLinearGradient` / `createRadialGradient` | per-frame allocation churn |
+| `getImageData` | forces a pipeline stall every frame |
 
-The engine wraps every `draw()` in `save()`/`restore()`, so you do not need them. If you do call
-them for a `translate`/`rotate`, they must balance — an unbalanced pair leaks canvas state into
-the rest of the frame.
+The engine wraps every `draw()` in `save()`/`restore()`, so you do not need them. If you call them
+for a `translate`/`rotate` they must balance, or canvas state leaks into the rest of the frame.
 
 Animate from the `frame` parameter: `Math.sin(frame * 0.15)` to bob, `frame % 60` to blink.
 
-## Sprite example
-
-```js
-draw(ctx, x, y, frame, state) {
-  // Body
-  ctx.fillStyle = '#4a90d9';
-  ctx.fillRect(x + 8, y + 12, 16, 20);
-
-  // Head
-  ctx.fillStyle = '#ffd93d';
-  ctx.fillRect(x + 6, y, 20, 14);
-
-  // Eyes — blink every 60 frames
-  if (frame % 60 > 5) {
-    ctx.fillStyle = '#000';
-    ctx.fillRect(x + 10, y + 5, 3, 3);
-    ctx.fillRect(x + 19, y + 5, 3, 3);
-  }
-
-  // Legs
-  ctx.fillStyle = '#3a7bc8';
-  if (state === 'run') {
-    const legOffset = Math.sin(frame * 0.3) * 4;
-    ctx.fillRect(x + 10, y + 32, 5, 12 + legOffset);
-    ctx.fillRect(x + 17, y + 32, 5, 12 - legOffset);
-  } else if (state === 'jump') {
-    ctx.fillRect(x + 8, y + 32, 6, 8);
-    ctx.fillRect(x + 18, y + 32, 6, 8);
-  }
-}
-```
+**Draw inside the box you declared.** `width` and `height` are the hitbox; a sprite painted wider
+than its box will feel unfair, and this is the one thing nothing checks for you.
 
 ## Parallax tiling
 
@@ -186,4 +156,4 @@ draw(ctx, scrollX, w, h) {
 
 Any other offset formula tears at the wrap point.
 
-[example-theme.js](example-theme.js) is a complete theme that satisfies every rule above.
+[example-theme.js](example-theme.js) is a complete theme that satisfies everything above.
