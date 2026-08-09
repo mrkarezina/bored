@@ -58,9 +58,29 @@ const RunnerEngine = (() => {
   // Object pools
   let obstacles = [];
   let powerups = [];
-  let lastSpawnTime = 0;
-  let lastObstacleSpawnTime = 0;
-  const MIN_OBSTACLE_GAP = 400; // ms minimum between obstacle spawns
+
+  /**
+   * Level generation. `envelope` is what the player can physically reach, worked
+   * out once from the theme's own physics; `scheduler` turns the theme's
+   * playlist into obstacles at distances that envelope says are survivable.
+   *
+   * This replaces the old timer-and-coin-flip spawner. That version fired on a
+   * fixed interval and picked a type at weighted random, with no idea that the
+   * gap between two obstacles can be too wide to clear in one jump and too tight
+   * to land between — at max speed 47% of the gaps it emitted were in that band.
+   */
+  let envelope = null;
+  let scheduler = null;
+
+  /**
+   * Physics runs on a fixed 60Hz step, decoupled from the display refresh.
+   * Previously every physics line multiplied by dt/16, which made the jump arc
+   * depend on the monitor: the same theme played differently at 144Hz than at
+   * 60Hz, and nothing that reasons about reachability could be trusted.
+   */
+  const STEP_MS = 1000 / 60;
+  const MAX_STEPS_PER_FRAME = 5;   // after a tab stall, drop time rather than spiral
+  let accumulator = 0;
 
   // Floating text popups
   let floatingTexts = [];
@@ -72,7 +92,6 @@ const RunnerEngine = (() => {
 
   // Difficulty
   let currentSpeed = 0;
-  let currentSpawnInterval = 0;
 
   // Frame timing
   let currentDt = 16;
@@ -101,9 +120,15 @@ const RunnerEngine = (() => {
       }
     });
 
+    // What this player can reach. Everything about spacing is derived from it,
+    // so it is computed before anything else and throws loudly on physics that
+    // cannot produce a playable arc.
+    envelope = Envelope.compute(theme.player);
+    assertObstaclesAreClearable();
+
     // Initialize subsystems
     InputHandler.init(canvas, { onJump, onJumpRelease, onDuck, onDuckRelease, onAction });
-    AudioEngine.init(theme.sounds || {});
+    AudioEngine.init(theme.sounds);
     ParticleEngine.init(ctx, canvas.width, canvas.height);
     HUD.init(ctx, theme);
     ScoreboardUI.init(theme);
@@ -124,6 +149,43 @@ const RunnerEngine = (() => {
 
     showMenu();
     requestAnimationFrame(gameLoop);
+  }
+
+  /**
+   * Every obstacle must be survivable by the move it asks for, before the game
+   * ever starts. Two ways a theme gets this wrong:
+   *
+   *   - a ground obstacle taller than the jump can clear, so it is simply a wall
+   *   - an air obstacle that dips into the ducking player, either because it is
+   *     too tall or because its motion carries it down there
+   *
+   * The second is the interesting one: `bob(8)` on a bird that only just fits
+   * the duck band makes it stop fitting. Motion declares a bound precisely so
+   * this can be checked by arithmetic instead of discovered by dying.
+   */
+  function assertObstaclesAreClearable() {
+    for (const o of theme.obstacles || []) {
+      const bound = o.motion ? Motion.boundsOf(o.motion, o) : { dx: 0, dy: 0 };
+      const swept = o.height + bound.dy * 2;
+
+      if (o.type === 'air') {
+        if (swept > envelope.maxAirHeight) {
+          throw new Error(
+            `RunnerEngine: air obstacle "${o.name}" sweeps ${swept}px ` +
+            `(${o.height}px tall${bound.dy ? ` plus ${bound.dy}px of motion either way` : ''}) ` +
+            `but the duck clearance band only admits ${envelope.maxAirHeight}px. ` +
+            `A ducking player would still be hit. Make it shorter, reduce the motion, ` +
+            `or widen player.height - player.duckHeight.`
+          );
+        }
+      } else if (o.height >= envelope.peak * 0.9) {
+        throw new Error(
+          `RunnerEngine: ground obstacle "${o.name}" is ${o.height}px tall but the ` +
+          `jump only peaks at ${envelope.peak.toFixed(0)}px. Nothing clears it. ` +
+          `Cap it around ${Math.floor(envelope.peak * 0.85)}px or give the player a stronger jump.`
+        );
+      }
+    }
   }
 
   function handleResize() {
@@ -177,9 +239,19 @@ const RunnerEngine = (() => {
     lastFrameTime = gameStartTime;
     elapsed = 0;
     currentSpeed = theme.difficulty.startSpeed;
-    currentSpawnInterval = theme.difficulty.startSpawnInterval;
-    lastSpawnTime = gameStartTime;
-    lastObstacleSpawnTime = 0;
+    accumulator = 0;
+
+    // A fresh scheduler per run, so the level is different every time but
+    // reproducible when a seed is pinned — which is what lets playtest.js replay
+    // the exact run that failed.
+    scheduler = Rhythm.scheduler({
+      playlist: theme.rhythm,
+      env: envelope,
+      obstacles: theme.obstacles,
+      powerups: theme.powerups || [],
+      seed: theme.seed !== undefined ? theme.seed : (Math.random() * 0x7fffffff) | 0,
+    });
+    scheduler.validate(theme.difficulty.startSpeed);
 
     // Hide menu
     const menuEl = document.getElementById('menu-screen');
@@ -248,6 +320,10 @@ const RunnerEngine = (() => {
   }
 
   function onJump() {
+    // Browsers only allow an AudioContext to start from inside a user gesture.
+    // This is that gesture — miss it and the game is silent on mobile forever.
+    AudioEngine.unlock();
+
     if (state === STATE.MENU) {
       startGame();
       return;
@@ -288,6 +364,7 @@ const RunnerEngine = (() => {
   }
 
   function onAction() {
+    AudioEngine.unlock();
     if (state === STATE.MENU) startGame();
     else if (state === STATE.GAME_OVER) showMenu();
   }
@@ -319,6 +396,10 @@ const RunnerEngine = (() => {
         return;
       }
 
+      // Deliberately wall-clock scaled rather than fixed-step. Nothing here is
+      // simulation — the player is already dead and no input is accepted — so
+      // what matters is that the tumble lasts the same length of time at any
+      // refresh rate. The playing state is the opposite case and is stepped.
       dyingTimer -= dt;
       const dtMult = dt / 16;
       dyingVY += 0.5 * dtMult; // gravity on corpse
@@ -337,75 +418,67 @@ const RunnerEngine = (() => {
     }
 
     // --- STATE.PLAYING ---
-    elapsed = timestamp - gameStartTime;
+    // Physics advances in whole fixed steps and rendering happens once, so a
+    // 144Hz display and a 60Hz one simulate identically. Leftover time carries
+    // to the next frame instead of being smeared into the step size.
+    accumulator += dt;
+    let steps = 0;
+    while (accumulator >= STEP_MS && steps < MAX_STEPS_PER_FRAME && state === STATE.PLAYING) {
+      accumulator -= STEP_MS;
+      steps++;
+      stepPlaying();
+    }
+    // A long stall (backgrounded tab, GC pause) must not turn into a burst of
+    // catch-up frames the player cannot react to. Drop the debt instead.
+    if (steps >= MAX_STEPS_PER_FRAME) accumulator = 0;
+
+    draw(timestamp);
+  }
+
+  /**
+   * One fixed 60Hz step of the playing state. Every quantity here is per-step,
+   * which is why there is no dt multiplier anywhere in it.
+   */
+  function stepPlaying() {
+    elapsed += STEP_MS;
     frame++;
 
     // Difficulty ramp — logarithmic curve for exciting start, fair plateau
     const elapsedSec = elapsed / 1000;
     const maxSpeedBonus = theme.difficulty.maxSpeed - theme.difficulty.startSpeed;
     currentSpeed = theme.difficulty.startSpeed + maxSpeedBonus * (1 - Math.exp(-elapsedSec * (theme.difficulty.speedRampPerSecond / maxSpeedBonus)));
-    currentSpawnInterval = Math.max(
-      theme.difficulty.startSpawnInterval + elapsedSec * theme.difficulty.spawnRampPerSecond,
-      theme.difficulty.minSpawnInterval
-    );
 
     // Slow-mo effect
-    let speedMult = 1;
-    if (activeEffects['slow-mo']) speedMult = 0.5;
-
+    const speedMult = activeEffects['slow-mo'] ? 0.5 : 1;
     const effectiveSpeed = currentSpeed * speedMult;
 
     // Update input forgiveness timers
-    if (coyoteTimer > 0) coyoteTimer -= dt;
-    if (jumpBufferTimer > 0) jumpBufferTimer -= dt;
+    if (coyoteTimer > 0) coyoteTimer -= STEP_MS;
+    if (jumpBufferTimer > 0) jumpBufferTimer -= STEP_MS;
 
-    // Update player physics
-    updatePlayer(dt);
+    updatePlayer();
 
-    // Spawn obstacles (with minimum gap)
-    if (timestamp - lastSpawnTime > currentSpawnInterval &&
-        timestamp - lastObstacleSpawnTime > MIN_OBSTACLE_GAP) {
-      spawnObstacle();
-      lastSpawnTime = timestamp;
-      lastObstacleSpawnTime = timestamp;
+    // Build the road ahead. The scheduler decides what and where; everything it
+    // hands back is already spaced so it can be got through.
+    for (const ev of scheduler.update(distance, effectiveSpeed, elapsedSec)) {
+      if (ev.kind === 'obstacle') spawnObstacleAt(ev);
+      else spawnPowerupAt(ev);
     }
 
-    // Spawn powerups
-    if (theme.powerups && theme.powerups.length > 0) {
-      for (const pu of theme.powerups) {
-        if (Math.random() < (pu.spawnChance || 0.01) * (dt / 16)) {
-          spawnPowerup(pu);
-        }
-      }
-    }
+    updateObstacles(effectiveSpeed);
+    if (state !== STATE.PLAYING) return;   // death triggered mid-step
 
-    // Update obstacles
-    updateObstacles(effectiveSpeed, dt);
-    if (state !== STATE.PLAYING) {
-      // Death was triggered — draw and skip rest of update
-      draw(timestamp);
-      return;
-    }
+    updatePowerups(effectiveSpeed);
+    updateEffects(STEP_MS);
+    updateFloatingTexts(STEP_MS);
 
-    // Update powerups
-    updatePowerups(effectiveSpeed, dt);
-
-    // Update active effects
-    updateEffects(dt);
-
-    // Update floating texts
-    updateFloatingTexts(dt);
-
-    // Update score (dt-scaled so score rate is consistent across framerates)
-    const dtMult = dt / 16;
     const scoreMult = activeEffects['2x-score'] ? 2 : 1;
-    const scoreInc = theme.scoring.distancePointsPerFrame * comboMultiplier * scoreMult * dtMult;
     const prevScore = score;
-    score += scoreInc;
-    distance += effectiveSpeed * dtMult;
+    score += theme.scoring.distancePointsPerFrame * comboMultiplier * scoreMult;
+    distance += effectiveSpeed;
 
     // Combo decay
-    if (combo > 0 && timestamp - lastCollectTime > theme.scoring.comboDecayMs) {
+    if (combo > 0 && elapsed - lastCollectTime > theme.scoring.comboDecayMs) {
       combo = 0;
       comboMultiplier = 1;
     }
@@ -430,16 +503,12 @@ const RunnerEngine = (() => {
     }
 
     // Squash & stretch lerp back to normal
-    const lerpRate = 1 - Math.pow(0.85, dt / 16);
+    const lerpRate = 1 - Math.pow(0.85, 1);
     squashX += (1.0 - squashX) * lerpRate;
     squashY += (1.0 - squashY) * lerpRate;
-
-    // Draw everything
-    draw(timestamp);
   }
 
-  function updatePlayer(dt) {
-    const dtMult = dt / 16;
+  function updatePlayer() {
     wasGrounded = isGrounded;
 
     // Gravity with enhanced fall speed + hang time
@@ -459,8 +528,8 @@ const RunnerEngine = (() => {
         gravityMult *= 0.5;
       }
 
-      playerVY += theme.player.gravity * gravityMult * dtMult;
-      playerY += playerVY * dtMult;
+      playerVY += theme.player.gravity * gravityMult;
+      playerY += playerVY;
 
       // Ground collision
       if (playerY >= theme.player.groundY) {
@@ -493,62 +562,85 @@ const RunnerEngine = (() => {
     }
   }
 
-  function spawnObstacle() {
-    const pool = theme.obstacles;
-    if (!pool || pool.length === 0) return;
+  /**
+   * Place an obstacle the scheduler has decided on. `worldX` is an absolute
+   * position along the run, so the screen position is just the difference from
+   * how far we have travelled — sub-pixel exact, and independent of when in the
+   * frame this happened to be called.
+   */
+  function spawnObstacleAt(ev) {
+    const def = ev.def;
+    if (!def) return;
 
-    // Weighted random selection
-    const totalWeight = pool.reduce((s, o) => s + (o.weight || 1), 0);
-    let r = Math.random() * totalWeight;
-    let selected = pool[0];
-    for (const o of pool) {
-      r -= (o.weight || 1);
-      if (r <= 0) { selected = o; break; }
-    }
-
-    // Calculate Y position based on obstacle type
     let spawnY;
-    if (selected.type === 'air') {
-      // Position air obstacles in the "duck clearance zone":
-      // overlaps standing hitbox but clears ducking hitbox
+    if (def.type === 'air') {
+      // Air obstacles sit in the band that overlaps a standing player and
+      // clears a ducking one. assertObstaclesAreClearable() has already proved
+      // this one fits, motion included.
       const duckH = theme.player.duckHeight || theme.player.height * 0.5;
       const clearance = theme.player.height - duckH;
-      spawnY = theme.player.groundY + clearance / 2 - selected.height / 2;
+      spawnY = theme.player.groundY + clearance / 2 - def.height / 2;
     } else {
-      // Ground obstacles sit on the ground line
-      spawnY = theme.player.groundY + theme.player.height - selected.height;
+      spawnY = theme.player.groundY + theme.player.height - def.height;
     }
 
-    const obs = {
-      ...selected,
-      x: canvas.width + 20,
+    obstacles.push({
+      ...def,
+      x: ev.worldX - distance,
       y: spawnY,
+      baseY: spawnY,
+      dx: 0,
+      dy: 0,
+      rotate: 0,
+      scale: 1,
       active: true,
       passed: false,
       frame: 0,
-    };
-    obstacles.push(obs);
+      // Fixed at spawn, never re-rolled, so instances move out of step with
+      // each other without anything strobing.
+      phase: Math.random(),
+      screenX: ev.worldX - distance,
+    });
   }
 
-  function spawnPowerup(template) {
+  /**
+   * Power-ups are placed by the scheduler inside gaps, at an altitude taken from
+   * the jump arc — so they are reachable by construction. The old version rolled
+   * a per-frame dice at a random height with no relationship to the obstacle
+   * stream, and most of what it produced could not be got to.
+   */
+  function spawnPowerupAt(ev) {
     if (powerups.length >= 3) return;
+    const template = (theme.powerups || []).find((p) => p.name === ev.name);
+    if (!template) return;
 
-    const pu = {
+    powerups.push({
       ...template,
-      x: canvas.width + 20,
-      y: theme.player.groundY - 30 - Math.random() * 60,
+      x: ev.worldX - distance,
+      y: theme.player.groundY - ev.altitude,
       active: true,
       frame: 0,
-    };
-    powerups.push(pu);
+    });
   }
 
-  function updateObstacles(speed, dt) {
-    const dtMult = dt / 16;
+  function updateObstacles(speed) {
     for (let i = obstacles.length - 1; i >= 0; i--) {
       const obs = obstacles[i];
-      obs.x -= speed * (obs.minSpeed || 1) * dtMult;
+      obs.x -= speed;
       obs.frame++;
+      obs.screenX = obs.x;
+
+      // Motion blocks displace the obstacle from where the scroll put it. The
+      // offsets are applied to collision and drawing alike, so what the player
+      // sees and what can hit them stay the same thing.
+      if (obs.motion && obs.motion.length) {
+        const m = Motion.applyAll(obs.motion, obs, obs.frame);
+        obs.dx = m.dx;
+        obs.dy = m.dy;
+        obs.rotate = m.rotate;
+        obs.scale = m.scale;
+        obs.y = obs.baseY + m.dy;
+      }
 
       // Off screen
       if (obs.x + obs.width < -20) {
@@ -596,13 +688,12 @@ const RunnerEngine = (() => {
     }
   }
 
-  function updatePowerups(speed, dt) {
-    const dtMult = dt / 16;
+  function updatePowerups(speed) {
     const magnetActive = !!activeEffects['magnet'];
 
     for (let i = powerups.length - 1; i >= 0; i--) {
       const pu = powerups[i];
-      pu.x -= speed * dtMult;
+      pu.x -= speed;
       pu.frame++;
 
       // Magnet attraction
@@ -611,8 +702,8 @@ const RunnerEngine = (() => {
         const dy = playerY - pu.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist > 1 && dist < 200) {
-          pu.x += (dx / dist) * 5 * dtMult;
-          pu.y += (dy / dist) * 5 * dtMult;
+          pu.x += (dx / dist) * 5;
+          pu.y += (dy / dist) * 5;
         }
       }
 
@@ -638,7 +729,8 @@ const RunnerEngine = (() => {
 
     // Combo
     combo++;
-    lastCollectTime = performance.now();
+    // Measured on the fixed-step clock, the same one the combo decay reads.
+    lastCollectTime = elapsed;
     comboMultiplier = Math.min(1 + combo * 0.5, theme.scoring.comboMultiplierMax);
 
     // Activate effect
@@ -666,13 +758,22 @@ const RunnerEngine = (() => {
     const ph = isDucking ? (theme.player.duckHeight || theme.player.height * 0.5) : theme.player.height;
     const py = isDucking ? (playerY + theme.player.height - ph) : playerY;
 
+    // The hitbox is wherever motion has actually put the thing this frame, at
+    // whatever size it is actually being drawn. A sprite that grows must become
+    // harder to miss, or the drawing is lying to the player.
+    const scale = obj.scale || 1;
+    const w = obj.width * scale;
+    const h = obj.height * scale;
+    const ox = obj.x + (obj.dx || 0) - (w - obj.width) / 2;
+    const oy = obj.y - (h - obj.height) / 2;
+
     // AABB collision with padding for fairness
     const pad = 4;
     return (
-      playerX + pad < obj.x + obj.width - pad &&
-      playerX + pw - pad > obj.x + pad &&
-      py + pad < obj.y + obj.height - pad &&
-      py + ph - pad > obj.y + pad
+      playerX + pad < ox + w - pad &&
+      playerX + pw - pad > ox + pad &&
+      py + pad < oy + h - pad &&
+      py + ph - pad > oy + pad
     );
   }
 
@@ -731,11 +832,21 @@ const RunnerEngine = (() => {
       ctx.restore();
     }
 
-    // Obstacles
+    // Obstacles. Rotation and scale are applied about the sprite's centre so a
+    // spinning or breathing obstacle stays where its hitbox says it is.
     for (const obs of obstacles) {
       if (!obs.active) continue;
       ctx.save();
-      obs.draw(ctx, obs.x, obs.y, obs.frame);
+      const x = obs.x + (obs.dx || 0);
+      if (obs.rotate || (obs.scale && obs.scale !== 1)) {
+        const cx = x + obs.width / 2;
+        const cy = obs.y + obs.height / 2;
+        ctx.translate(cx, cy);
+        if (obs.rotate) ctx.rotate(obs.rotate);
+        if (obs.scale && obs.scale !== 1) ctx.scale(obs.scale, obs.scale);
+        ctx.translate(-cx, -cy);
+      }
+      obs.draw(ctx, x, obs.y, obs.frame);
       ctx.restore();
     }
 
@@ -808,5 +919,16 @@ const RunnerEngine = (() => {
     }
   }
 
-  return { start, getState: () => state, getScore: () => score };
+  // STATE and getFrame are exposed for tooling (playtest.js, the test suite).
+  // getFrame counts fixed physics steps, not rendered frames — the two differ
+  // whenever the accumulator carries time between frames, and anything
+  // measuring the simulation needs the former.
+  return {
+    start,
+    getState: () => state,
+    getScore: () => score,
+    getFrame: () => frame,
+    getSpeed: () => currentSpeed,
+    STATE,
+  };
 })();

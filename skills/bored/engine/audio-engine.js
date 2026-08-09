@@ -1,140 +1,96 @@
 /**
- * AudioEngine — Web Audio API synth for game sounds
- * Embed verbatim. Tuned via THEME.sounds config.
+ * AudioEngine — game sounds, synthesised by ZzFX from a curated palette.
+ *
+ * The public surface is unchanged from the hand-wired Web Audio version this
+ * replaces — init/jump/collect/hit/nearMiss/milestone/bgBeat — so nothing in
+ * runner-engine.js had to move. What changed is underneath: six sounds that were
+ * each ~20 lines of oscillator plumbing, tunable by four scalars, are now
+ * parameter arrays from lib/sound.js. Two of the six (nearMiss and milestone)
+ * previously ignored the theme entirely and were identical in every game ever
+ * generated; all six are themed now.
+ *
+ * Audio must never be able to take the game down. Every entry point is a
+ * no-op when Web Audio is unavailable, and ZzFX itself is wrapped.
  */
 const AudioEngine = (() => {
-  let audioCtx = null;
-  let config = {};
+  let sounds = null;
   let bgInterval = null;
   let bgBeatOn = false;
-  let masterGain = null;
 
-  function init(soundConfig) {
-    config = soundConfig || {};
-    try {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      masterGain = audioCtx.createGain();
-      masterGain.gain.value = 0.3;
-      masterGain.connect(audioCtx.destination);
-    } catch (e) {
-      console.warn('Web Audio not available');
-    }
+  /**
+   * `soundSet` comes from lib/sound.js — Sound.chiptune() and friends. A theme
+   * that somehow supplies nothing still gets a working game, just a quiet one.
+   */
+  function init(soundSet) {
+    sounds = soundSet || null;
+    if (sounds && typeof Vendor !== 'undefined') Vendor.zzfx.setVolume(0.3);
   }
 
-  function ensureCtx() {
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-    return !!audioCtx;
+  function play(slot, override) {
+    if (!sounds || typeof Vendor === 'undefined') return;
+    const params = override || sounds[slot];
+    if (params) Vendor.zzfx.play(params);
   }
 
-  function playTone(freq, duration, type, gainVal) {
-    if (!ensureCtx()) return;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = type || 'square';
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(gainVal || 0.15, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-    osc.connect(gain);
-    gain.connect(masterGain);
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
+  /**
+   * Create/resume the AudioContext. Must be called from inside a user-gesture
+   * handler: browsers suspend any context made before one, which is the whole
+   * "no sound on mobile" failure mode. runner-engine calls this on first input.
+   */
+  function unlock() {
+    if (typeof Vendor === 'undefined') return false;
+    return Vendor.zzfx.ensureContext();
   }
 
-  function jump() {
-    if (!ensureCtx()) return;
-    const freqs = config.jumpFreqs || [200, 500];
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(freqs[0], audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(freqs[1], audioCtx.currentTime + 0.15);
-    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-    osc.connect(gain);
-    gain.connect(masterGain);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.2);
-  }
+  function jump() { play('jump'); }
+  function hit() { play('hit'); }
+  function nearMiss() { play('nearMiss'); }
+  function milestone() { play('milestone'); }
 
+  /**
+   * Pickups rise a semitone per consecutive collect, so a streak audibly
+   * climbs. Capped at an octave so a long combo doesn't end up inaudible.
+   */
   function collect(combo) {
-    if (!ensureCtx()) return;
-    const freqs = config.collectFreqs || [523, 659, 784];
-    // Rising pitch for combo streaks (semitone per consecutive pickup)
-    const pitchMult = combo ? Math.pow(1.0595, Math.min(combo, 12)) : 1;
-    // Random pitch variation (+/- 15%) for organic feel
-    const variation = 0.85 + Math.random() * 0.3;
-    freqs.forEach((f, i) => {
-      setTimeout(() => playTone(f * pitchMult * variation, 0.15, 'sine', 0.12), i * 60);
-    });
+    if (!sounds || typeof Vendor === 'undefined') return;
+    const steps = Math.min(combo || 0, 12);
+    const mult = Math.pow(1.0595, steps);
+    Vendor.zzfx.play(Sound.transpose(sounds.collect, mult));
   }
 
-  function nearMiss() {
-    if (!ensureCtx()) return;
-    // Quick ascending whoosh
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-    osc.connect(gain);
-    gain.connect(masterGain);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.15);
-  }
-
-  function hit() {
-    if (!ensureCtx()) return;
-    const freq = config.hitFreq || 80;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
-    osc.connect(gain);
-    gain.connect(masterGain);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.4);
-
-    // Noise burst
-    const bufferSize = audioCtx.sampleRate * 0.2;
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-    const noise = audioCtx.createBufferSource();
-    noise.buffer = buffer;
-    const noiseGain = audioCtx.createGain();
-    noiseGain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-    noise.connect(noiseGain);
-    noiseGain.connect(masterGain);
-    noise.start();
-  }
-
-  function milestone() {
-    if (!ensureCtx()) return;
-    const notes = [523, 659, 784, 1047];
-    notes.forEach((f, i) => {
-      setTimeout(() => playTone(f, 0.2, 'sine', 0.1), i * 80);
-    });
-  }
-
+  /**
+   * The music: a bass pulse and a melody over it, on an eighth-note grid.
+   *
+   * Bass takes the root on beat one and a fifth on beat three — half-time, so it
+   * reads as a pulse rather than a metronome. A tick on every single beat is
+   * what turns background into nagging.
+   *
+   * Melody is the palette's motif, four bars of pentatonic that loop for the
+   * whole run. It is quieter than everything else in the mix on purpose: the
+   * player should notice it if they listen for it and not otherwise.
+   */
   function bgBeat(on) {
     if (on && !bgBeatOn) {
+      if (!sounds) return;
       bgBeatOn = true;
-      const bpm = config.bgBPM || 120;
-      const interval = 60000 / bpm;
-      let beat = 0;
+      const eighth = 60000 / (sounds.bpm || 112) / 2;
+      const motif = sounds.motif;
+      let step = 0;
+
       bgInterval = setInterval(() => {
         if (!bgBeatOn) return;
-        const freq = beat % 4 === 0 ? 60 : 45;
-        playTone(freq, 0.08, 'square', 0.04);
-        beat++;
-      }, interval);
+        const inBar = step % 8;                 // eight eighths to the bar
+        if (inBar === 0) play('beat', sounds.beat);
+        else if (inBar === 4) play('beat', Sound.transpose(sounds.beat, 1.5));
+
+        if (motif && motif.length && sounds.lead) {
+          const note = motif[step % motif.length];
+          if (note !== null && note !== undefined) {
+            play('lead', Sound.semitone(sounds.lead, note));
+          }
+        }
+        step++;
+      }, eighth);
     } else if (!on) {
       bgBeatOn = false;
       if (bgInterval) clearInterval(bgInterval);
@@ -142,5 +98,7 @@ const AudioEngine = (() => {
     }
   }
 
-  return { init, jump, collect, hit, nearMiss, milestone, bgBeat };
+  return { init, unlock, jump, collect, hit, nearMiss, milestone, bgBeat };
 })();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = AudioEngine;

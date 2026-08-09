@@ -16,7 +16,22 @@ const ENGINE_DIR = path.resolve(__dirname, '..');
 const SHELL = path.join(ENGINE_DIR, 'shell.html');
 const MARKER = '<!--BUILD:INJECT-->';
 
-// Load order. Nothing calls across modules at definition time, but keep
+/**
+ * The block library. This goes in FIRST, ahead of the theme, because a theme
+ * calls into it while it is being defined — `Pattern.single('crate')` runs at
+ * definition time, not at boot.
+ */
+const LIB = [
+  'vendor.js',
+  'envelope.js',
+  'patterns.js',
+  'rhythm.js',
+  'motion.js',
+  'palette.js',
+  'sound.js',
+];
+
+// Engine modules. Nothing calls across them at definition time, but keep
 // dependencies ahead of their consumers so the file reads top-down.
 const MODULES = [
   'audio-engine.js',
@@ -79,9 +94,26 @@ function ensureGameId(themeFile, src) {
   return { src: patched, gameId, minted: true };
 }
 
-function loadTheme(src, themeFile) {
+/** Read a set of modules from a directory, tagged so the output stays readable. */
+function readModules(dir, files) {
+  return files.map((file) => {
+    const p = path.join(ENGINE_DIR, dir, file);
+    if (!fs.existsSync(p)) die(`missing ${dir} module: ${p}`);
+    return `// ===== ${dir}/${file} =====\n${fs.readFileSync(p, 'utf8').trim()}`;
+  });
+}
+
+/**
+ * Evaluate the theme with the block library in scope. A theme is not inert
+ * data — `Pattern.cluster(...)` and `Palette.dusk(...)` run as the object is
+ * built — so the library has to exist before the theme source is touched.
+ *
+ * The library's Node-interop tails (`module.exports`, `require`) are inert here:
+ * neither identifier exists inside `new Function`, so those guards fall through.
+ */
+function loadTheme(src, themeFile, libSrc) {
   try {
-    return new Function(`${src}\n;return THEME;`)();
+    return new Function(`${libSrc}\n\n${src}\n;return THEME;`)();
   } catch (e) {
     die(`could not evaluate ${path.basename(themeFile)}: ${e.message}`);
   }
@@ -97,7 +129,9 @@ function main() {
 
   const raw = fs.readFileSync(themeFile, 'utf8');
   const { src, gameId, minted } = ensureGameId(themeFile, raw);
-  const theme = loadTheme(src, themeFile);
+
+  const lib = readModules('lib', LIB);
+  const theme = loadTheme(src, themeFile, lib.join('\n'));
 
   if (!theme || typeof theme !== 'object') die('THEME is not an object');
   if (!theme.name) die('THEME.name is required');
@@ -105,13 +139,10 @@ function main() {
   const shell = fs.readFileSync(SHELL, 'utf8');
   if (!shell.includes(MARKER)) die(`${SHELL} is missing the ${MARKER} marker`);
 
-  const modules = MODULES.map((file) => {
-    const p = path.join(ENGINE_DIR, 'engine', file);
-    if (!fs.existsSync(p)) die(`missing engine module: ${p}`);
-    return `// ===== ${file} =====\n${fs.readFileSync(p, 'utf8').trim()}`;
-  });
+  const modules = readModules('engine', MODULES);
 
   const bundle = [
+    ...lib,
     '// ===== theme =====',
     src.trim(),
     ...modules,

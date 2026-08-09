@@ -1,431 +1,234 @@
-const THEME = {
-  name: 'Jetpack Monkey',
-  description: 'Soar through the jungle at sunset',
-  gameId: 'b7e3a1d4-92f8-4c6b-a0e5-8f1d3c7b9a62',
+/**
+ * Rooftop Run — a complete worked theme.
+ *
+ * Read this for the shape, then write something entirely your own. Note what is
+ * NOT here: no spawn intervals, no obstacle weights, no per-frame power-up
+ * probabilities, no hand-picked colour values, no sound frequencies. Those are
+ * all library concerns now. What is left is the part that makes it this game and
+ * not some other one — the drawing, and the rhythm.
+ */
 
-  colors: {
-    bg: '#1a0e2e',
-    text: '#f5f0e8',
-    accent: '#ff9944',
-    score: '#ffdd55',
-    ground: '#2a1848',
-    groundLine: '#ff9944',
-  },
+// Colours are solved, not chosen: every obstacle colour is guaranteed to clear
+// a contrast threshold against the background and to sit at least 25 degrees of
+// hue from the others, so nothing can end up muddy or indistinguishable.
+const PALETTE = Palette.dusk('#2b1b3d', { accent: '#ff9f43', obstacles: 4 });
+
+const THEME = {
+  name: 'Rooftop Run',
+  description: 'A cat with somewhere to be',
+  gameId: 'GENERATED',
+
+  colors: PALETTE,
 
   player: {
-    width: 40, height: 48,
-    duckHeight: 28,
+    width: 34, height: 44,
+    duckHeight: 24,
     groundY: 296,
     jumpForce: -12.5,
     gravity: 0.65,
+
     draw(ctx, x, y, frame, state) {
-      const duck = state === 'duck';
+      const c = PALETTE.accent;
+      const dark = '#c9762f';
+      const ducking = state === 'duck';
+      const h = ducking ? 24 : 44;
+      const top = y + (ducking ? 20 : 0);
 
-      // === Jetpack ===
-      ctx.fillStyle = '#556';
-      ctx.fillRect(x + 1, y + (duck ? 6 : 14), 9, 14);
-      // Flame
-      const fl = Math.sin(frame * 0.4) * 2;
-      ctx.fillStyle = '#ff6622';
-      ctx.beginPath();
-      ctx.moveTo(x + 2, y + (duck ? 20 : 28));
-      ctx.lineTo(x + 9, y + (duck ? 20 : 28));
-      ctx.lineTo(x + 5, y + (duck ? 27 : 35) + fl);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#ffcc44';
-      ctx.beginPath();
-      ctx.moveTo(x + 3, y + (duck ? 20 : 28));
-      ctx.lineTo(x + 8, y + (duck ? 20 : 28));
-      ctx.lineTo(x + 5, y + (duck ? 24 : 32) + fl * 0.5);
-      ctx.closePath();
-      ctx.fill();
+      // Body
+      ctx.fillStyle = c;
+      ctx.fillRect(x + 4, top + h - 22, 26, 18);
 
-      // === Body ===
-      ctx.fillStyle = '#8B4513';
-      if (duck) {
-        // Wide, flat body
-        ctx.beginPath();
-        ctx.ellipse(x + 22, y + 16, 14, 10, 0, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        ctx.beginPath();
-        ctx.ellipse(x + 22, y + 28, 12, 16, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Belly
-      ctx.fillStyle = '#ddb07a';
-      if (duck) {
-        ctx.beginPath();
-        ctx.ellipse(x + 24, y + 16, 9, 7, 0, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        ctx.beginPath();
-        ctx.ellipse(x + 23, y + 30, 8, 11, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // === Head ===
-      const bob = state === 'run' ? Math.sin(frame * 0.12) * 1 : 0;
-      const hy = y + bob;
-      ctx.fillStyle = '#8B4513';
-      ctx.beginPath();
-      ctx.arc(x + 24, hy + (duck ? 4 : 8), 11, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Face
-      ctx.fillStyle = '#ddb07a';
-      ctx.beginPath();
-      ctx.arc(x + 25, hy + (duck ? 6 : 10), 8, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Eyes
-      const ey = hy + (duck ? 3 : 7);
-      if (state === 'hit') {
-        ctx.strokeStyle = '#222';
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(x+20,ey-2); ctx.lineTo(x+24,ey+2); ctx.moveTo(x+24,ey-2); ctx.lineTo(x+20,ey+2); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x+27,ey-2); ctx.lineTo(x+31,ey+2); ctx.moveTo(x+31,ey-2); ctx.lineTo(x+27,ey+2); ctx.stroke();
-      } else {
-        // Blink
-        if (frame % 100 > 5) {
-          ctx.fillStyle = '#FFF';
-          ctx.beginPath(); ctx.arc(x + 21, ey, 3.5, 0, Math.PI * 2); ctx.fill();
-          ctx.beginPath(); ctx.arc(x + 29, ey, 3.5, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#111';
-          const look = state === 'jump' ? -1 : 0.5;
-          ctx.beginPath(); ctx.arc(x + 22 + look, ey + look * 0.5, 2, 0, Math.PI * 2); ctx.fill();
-          ctx.beginPath(); ctx.arc(x + 30 + look, ey + look * 0.5, 2, 0, Math.PI * 2); ctx.fill();
-        } else {
-          ctx.strokeStyle = '#111';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.moveTo(x+18, ey); ctx.lineTo(x+24, ey); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(x+26, ey); ctx.lineTo(x+32, ey); ctx.stroke();
-        }
-      }
-
-      // Smile
-      if (state !== 'hit') {
-        ctx.strokeStyle = '#5a2a08';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(x + 25, hy + (duck ? 8 : 12), 4, 0.1, Math.PI - 0.1);
-        ctx.stroke();
-      }
+      // Head
+      ctx.fillRect(x + (ducking ? 20 : 18), top + h - 34, 14, 14);
 
       // Ears
-      ctx.fillStyle = '#6a3010';
-      ctx.beginPath(); ctx.arc(x + 14, hy + (duck ? 2 : 5), 4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#ddb07a';
-      ctx.beginPath(); ctx.arc(x + 14, hy + (duck ? 2 : 5), 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x + (ducking ? 21 : 19), top + h - 34);
+      ctx.lineTo(x + (ducking ? 24 : 22), top + h - 41);
+      ctx.lineTo(x + (ducking ? 27 : 25), top + h - 34);
+      ctx.fill();
 
-      // === Legs ===
-      if (!duck) {
-        ctx.fillStyle = '#6a3010';
-        if (state === 'run') {
-          const leg = Math.sin(frame * 0.25) * 4;
-          ctx.fillRect(x + 14, y + 42, 7, 6 + leg);
-          ctx.fillRect(x + 25, y + 42, 7, 6 - leg);
-        } else if (state === 'jump') {
-          // Tucked legs
-          ctx.fillRect(x + 14, y + 40, 7, 5);
-          ctx.fillRect(x + 25, y + 40, 7, 5);
-        } else {
-          ctx.fillRect(x + 14, y + 42, 7, 6);
-          ctx.fillRect(x + 25, y + 42, 7, 6);
-        }
-      }
+      // Eye — blinks on a slow cycle, driven by frame so it never strobes
+      ctx.fillStyle = '#1b1026';
+      if (frame % 140 > 8) ctx.fillRect(x + (ducking ? 28 : 26), top + h - 30, 3, 3);
 
-      // Tail
-      ctx.strokeStyle = '#6a3010';
+      // Tail, higher when airborne
+      ctx.strokeStyle = dark;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      if (duck) {
-        ctx.moveTo(x + 32, y + 20);
-        ctx.quadraticCurveTo(x + 40, y + 14, x + 38, y + 8);
-      } else {
-        const wag = Math.sin(frame * 0.15) * 2;
-        ctx.moveTo(x + 32, y + 36);
-        ctx.quadraticCurveTo(x + 42, y + 30 + wag, x + 38, y + 22);
-      }
+      ctx.moveTo(x + 4, top + h - 18);
+      const lift = state === 'jump' ? -10 : Math.sin(frame * 0.25) * 4;
+      ctx.quadraticCurveTo(x - 6, top + h - 22 + lift, x - 8, top + h - 30 + lift);
       ctx.stroke();
+
+      // Legs
+      ctx.fillStyle = dark;
+      if (state === 'run') {
+        const swing = Math.sin(frame * 0.35) * 5;
+        ctx.fillRect(x + 7, top + h - 4, 5, 4 + swing);
+        ctx.fillRect(x + 20, top + h - 4, 5, 4 - swing);
+      } else if (!ducking) {
+        ctx.fillRect(x + 7, top + h - 4, 5, 3);
+        ctx.fillRect(x + 20, top + h - 4, 5, 3);
+      }
     },
   },
 
   obstacles: [
-    // === GROUND: Spikes — triangles, instantly readable as danger ===
     {
-      name: 'Spike',
-      type: 'ground',
-      width: 30, height: 30,
-      weight: 4,
-      draw(ctx, x, y, frame) {
-        ctx.fillStyle = '#ee4433';
+      name: 'AC unit', type: 'ground', width: 40, height: 38,
+      draw(ctx, x, y) {
+        ctx.fillStyle = PALETTE.obstacle(0);
+        ctx.fillRect(x, y, 40, 38);
+        ctx.strokeStyle = '#1b1026';
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(x + 1, y + 1, 38, 36);
         ctx.beginPath();
-        ctx.moveTo(x + 2, y + 30);
-        ctx.lineTo(x + 9, y + 3);
-        ctx.lineTo(x + 16, y + 30);
-        ctx.closePath();
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(x + 14, y + 30);
-        ctx.lineTo(x + 21, y + 5);
-        ctx.lineTo(x + 28, y + 30);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = '#aa2211';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x, y + 30);
-        ctx.lineTo(x + 9, y + 3);
-        ctx.lineTo(x + 15, y + 20);
-        ctx.lineTo(x + 21, y + 5);
-        ctx.lineTo(x + 30, y + 30);
-        ctx.closePath();
+        for (let i = 0; i < 3; i++) { ctx.moveTo(x + 8, y + 12 + i * 8); ctx.lineTo(x + 32, y + 12 + i * 8); }
         ctx.stroke();
       },
     },
-    // === GROUND: Tall pillar — rectangle, forces committed jump ===
     {
-      name: 'Pillar',
-      type: 'ground',
-      width: 24, height: 50,
-      weight: 2,
-      draw(ctx, x, y, frame) {
-        ctx.fillStyle = '#cc5533';
-        ctx.fillRect(x + 2, y + 2, 20, 46);
-        ctx.fillStyle = '#dd7755';
-        ctx.fillRect(x + 6, y + 4, 8, 42);
-        ctx.strokeStyle = '#882211';
+      name: 'chimney', type: 'ground', width: 26, height: 52,
+      draw(ctx, x, y) {
+        ctx.fillStyle = PALETTE.obstacle(1);
+        ctx.fillRect(x, y, 26, 52);
+        ctx.fillRect(x - 3, y, 32, 8);
+        ctx.strokeStyle = '#1b1026';
         ctx.lineWidth = 2.5;
-        ctx.strokeRect(x + 1, y + 1, 22, 48);
+        ctx.strokeRect(x + 1, y + 1, 24, 50);
       },
     },
-    // === GROUND: Low wide block — short hop ===
     {
-      name: 'Log',
-      type: 'ground',
-      width: 44, height: 22,
-      weight: 3,
-      draw(ctx, x, y, frame) {
-        ctx.fillStyle = '#bb5522';
-        ctx.beginPath();
-        ctx.ellipse(x + 22, y + 12, 21, 10, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#dd8855';
-        ctx.beginPath();
-        ctx.ellipse(x + 22, y + 10, 14, 6, 0, 0, Math.PI * 2);
-        ctx.fill();
-        // Tree rings
-        ctx.strokeStyle = '#995522';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.ellipse(x + 22, y + 10, 8, 3, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        // Outline
-        ctx.strokeStyle = '#773311';
+      name: 'crate', type: 'ground', width: 34, height: 30,
+      draw(ctx, x, y) {
+        ctx.fillStyle = PALETTE.obstacle(2);
+        ctx.fillRect(x, y, 34, 30);
+        ctx.strokeStyle = '#1b1026';
         ctx.lineWidth = 2.5;
+        ctx.strokeRect(x + 1, y + 1, 32, 28);
         ctx.beginPath();
-        ctx.ellipse(x + 22, y + 12, 22, 11, 0, 0, Math.PI * 2);
+        ctx.moveTo(x + 2, y + 2); ctx.lineTo(x + 32, y + 28);
+        ctx.moveTo(x + 32, y + 2); ctx.lineTo(x + 2, y + 28);
         ctx.stroke();
       },
     },
-    // === AIR: Coconut — circle, duck under ===
     {
-      name: 'Coconut',
-      type: 'air',
-      width: 28, height: 28,
-      weight: 3,
+      name: 'pigeon', type: 'air', width: 30, height: 18,
+      // Bounded motion: the engine adds the sweep to the hitbox and refuses to
+      // start if it would carry the bird into a ducking player.
+      motion: [Motion.bob(6, 900)],
       draw(ctx, x, y, frame) {
-        ctx.fillStyle = '#8B5E3C';
+        ctx.fillStyle = PALETTE.obstacle(3);
         ctx.beginPath();
-        ctx.arc(x + 14, y + 14, 13, 0, Math.PI * 2);
+        ctx.ellipse(x + 15, y + 9, 13, 8, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = '#aa7755';
-        ctx.beginPath();
-        ctx.arc(x + 14, y + 14, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#664422';
-        ctx.beginPath(); ctx.arc(x + 10, y + 11, 2, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(x + 18, y + 11, 2, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(x + 14, y + 18, 2, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = '#442200';
+        const flap = Math.sin(frame * 0.4) * 6;
+        ctx.strokeStyle = '#1b1026';
         ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.arc(x + 14, y + 14, 13, 0, Math.PI * 2);
+        ctx.moveTo(x + 10, y + 8); ctx.lineTo(x + 4, y + 4 - flap);
+        ctx.moveTo(x + 20, y + 8); ctx.lineTo(x + 26, y + 4 + flap);
         ctx.stroke();
+        ctx.fillStyle = '#1b1026';
+        ctx.fillRect(x + 22, y + 6, 3, 3);
       },
     },
   ],
+
+  /**
+   * The playlist is the voice of the game. Weights are relative, so singles show
+   * up three times as often as the gauntlet. Everything about spacing, ramping,
+   * not repeating and leaving room to breathe is the scheduler's job.
+   */
+  rhythm: Rhythm.playlist([
+    [3, Pattern.single('AC unit')],
+    [2, Pattern.run('crate', 3, { gap: 'even' })],
+    [2, Pattern.cluster(['crate', 'AC unit'])],
+    [2, Pattern.pair('chimney', 'pigeon')],
+    [1, Pattern.run('chimney', 2, { gap: 'tight' })],
+    [1, Pattern.gauntlet('pigeon', 3)],
+  ]),
 
   powerups: [
     {
-      name: 'Golden Banana',
-      width: 22, height: 22,
-      points: 150,
-      effect: 'shield',
-      duration: 0,
-      spawnChance: 0.003,
+      name: 'catnip', effect: 'magnet', duration: 5000, points: 100,
+      width: 22, height: 22, frequency: 'common',
       draw(ctx, x, y, frame) {
-        const bob = Math.sin(frame * 0.06) * 3;
-        const glow = 0.5 + Math.sin(frame * 0.08) * 0.3;
-        // Soft glow
-        ctx.fillStyle = 'rgba(255, 220, 80, ' + (glow * 0.12) + ')';
+        const pulse = 1 + Math.sin(frame * 0.15) * 0.12;
+        ctx.fillStyle = '#7ee787';
         ctx.beginPath();
-        ctx.arc(x + 11, y + 11 + bob, 15, 0, Math.PI * 2);
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+          ctx.ellipse(x + 11 + Math.cos(a) * 6, y + 11 + Math.sin(a) * 6, 5 * pulse, 3 * pulse, a, 0, Math.PI * 2);
+        }
         ctx.fill();
-        // Banana
-        ctx.fillStyle = '#FFD700';
-        ctx.beginPath();
-        ctx.arc(x + 11, y + 6 + bob, 8, 0.3, Math.PI - 0.3);
-        ctx.quadraticCurveTo(x + 5, y + 20 + bob, x + 15, y + 17 + bob);
-        ctx.fill();
-        ctx.strokeStyle = '#C8A200';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(x + 11, y + 6 + bob, 8, 0.3, Math.PI - 0.3);
-        ctx.quadraticCurveTo(x + 5, y + 20 + bob, x + 15, y + 17 + bob);
-        ctx.stroke();
       },
     },
     {
-      name: 'Mango Boost',
-      width: 20, height: 20,
-      points: 100,
-      effect: '2x-score',
-      duration: 6000,
-      spawnChance: 0.003,
+      name: 'nine lives', effect: 'shield', points: 150,
+      width: 24, height: 24, frequency: 'rare',
       draw(ctx, x, y, frame) {
-        const bob = Math.sin(frame * 0.07) * 3;
-        // Glow
-        ctx.fillStyle = 'rgba(100, 255, 100, 0.1)';
+        ctx.strokeStyle = PALETTE.score;
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(x + 10, y + 10 + bob, 14, 0, Math.PI * 2);
-        ctx.fill();
-        // Mango
-        ctx.fillStyle = '#55cc55';
-        ctx.beginPath();
-        ctx.ellipse(x + 10, y + 11 + bob, 8, 9, 0.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#77ee77';
-        ctx.beginPath();
-        ctx.ellipse(x + 9, y + 9 + bob, 4, 5, 0.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#339933';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.ellipse(x + 10, y + 11 + bob, 8, 9, 0.2, 0, Math.PI * 2);
+        ctx.arc(x + 12, y + 12, 9 + Math.sin(frame * 0.12) * 1.5, 0, Math.PI * 2);
         ctx.stroke();
-      },
-    },
-    {
-      name: 'Coconut Milk',
-      width: 20, height: 20,
-      points: 200,
-      effect: 'invincible',
-      duration: 5000,
-      spawnChance: 0.002,
-      draw(ctx, x, y, frame) {
-        const bob = Math.sin(frame * 0.08) * 3;
-        // Glow
-        ctx.fillStyle = 'rgba(180, 220, 255, 0.12)';
-        ctx.beginPath();
-        ctx.arc(x + 10, y + 10 + bob, 14, 0, Math.PI * 2);
-        ctx.fill();
-        // Cup
-        ctx.fillStyle = '#eee8dd';
-        ctx.fillRect(x + 3, y + 4 + bob, 14, 14);
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(x + 5, y + 6 + bob, 10, 10);
-        // Coconut icon
-        ctx.fillStyle = '#aa8866';
-        ctx.beginPath();
-        ctx.arc(x + 10, y + 11 + bob, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#bbaa99';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(x + 2, y + 3 + bob, 16, 16);
+        ctx.fillStyle = PALETTE.score;
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText('9', x + 8, y + 16);
       },
     },
   ],
 
+  // Two layers, both well behind the action. Anything drawn where the player is
+  // making decisions costs them reaction time.
   backgrounds: [
-    // Layer 1 — Sunset sky with distant mountains
     {
-      speed: 0.08,
+      speed: 0.18,
       draw(ctx, scrollX, w, h) {
-        // Sky gradient bands (warm sunset)
-        ctx.fillStyle = '#1a0e2e';
-        ctx.fillRect(0, 0, w, h * 0.3);
-        ctx.fillStyle = '#2a1040';
-        ctx.fillRect(0, h * 0.3, w, h * 0.15);
-        ctx.fillStyle = '#3a1848';
-        ctx.fillRect(0, h * 0.45, w, h * 0.1);
-        ctx.fillStyle = '#4a2050';
-        ctx.fillRect(0, h * 0.55, w, h * 0.1);
-
-        // Distant mountain range — very subtle
-        ctx.fillStyle = '#1f1238';
-        const sp = 500;
-        const off = -(scrollX % sp);
-        for (let mx = off - sp; mx < w + sp; mx += sp) {
-          ctx.beginPath();
-          ctx.moveTo(mx, h * 0.72);
-          ctx.lineTo(mx + 120, h * 0.42);
-          ctx.lineTo(mx + 220, h * 0.55);
-          ctx.lineTo(mx + 350, h * 0.38);
-          ctx.lineTo(mx + 500, h * 0.68);
-          ctx.lineTo(mx + 500, h * 0.72);
-          ctx.closePath();
-          ctx.fill();
+        ctx.fillStyle = '#41285a';
+        const spacing = 220;
+        const offset = -(scrollX % spacing);
+        for (let x = offset - spacing; x < w + spacing; x += spacing) {
+          ctx.fillRect(x + 20, h - 210, 70, 210);
+          ctx.fillRect(x + 110, h - 260, 55, 260);
         }
-
-        // Fill below mountains
-        ctx.fillStyle = '#1f1238';
-        ctx.fillRect(0, h * 0.68, w, h * 0.32);
       },
     },
-    // Layer 2 — Treeline silhouette
     {
-      speed: 0.25,
+      speed: 0.42,
       draw(ctx, scrollX, w, h) {
-        ctx.fillStyle = '#251540';
-        const sp = 200;
-        const off = -(scrollX % sp);
-        for (let tx = off - sp; tx < w + sp; tx += sp) {
-          ctx.beginPath();
-          ctx.arc(tx + 60, h * 0.64, 30, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(tx + 110, h * 0.60, 36, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(tx + 160, h * 0.66, 26, 0, Math.PI * 2);
-          ctx.fill();
+        ctx.fillStyle = '#33204a';
+        const spacing = 160;
+        const offset = -(scrollX % spacing);
+        for (let x = offset - spacing; x < w + spacing; x += spacing) {
+          ctx.fillRect(x, h - 150, 90, 150);
+          ctx.fillRect(x + 30, h - 168, 12, 20);
         }
-        // Fill below treeline
-        ctx.fillRect(0, h * 0.72, w, h * 0.28);
       },
     },
   ],
 
   drawGround(ctx, scrollX, groundY, w, h) {
-    ctx.fillStyle = this.colors.ground;
-    ctx.fillRect(0, groundY, w, h);
-
-    // Single bright accent line at top
-    ctx.fillStyle = this.colors.groundLine;
-    ctx.fillRect(0, groundY, w, 2);
+    ctx.fillStyle = PALETTE.ground;
+    ctx.fillRect(0, groundY, w, h - groundY);
+    ctx.fillStyle = PALETTE.groundLine;
+    ctx.fillRect(0, groundY, w, 3);
+    const spacing = 90;
+    const offset = -(scrollX % spacing);
+    for (let x = offset - spacing; x < w + spacing; x += spacing) {
+      ctx.fillRect(x, groundY + 14, 34, 2);
+    }
   },
 
   particles: {
-    dust:     { colors: ['#aa8866', '#887755'], size: 4 },
-    jump:     { colors: ['#ff9944'], size: 3 },
-    death:    { colors: ['#ff6633', '#ffaa44', '#ffdd66'], size: 7 },
-    collect:  { colors: ['#FFD700', '#ffcc44'], size: 5 },
-    trail:    { colors: ['#ff8833'], size: 2 },
-    confetti: { colors: ['#FFD700', '#ff6633', '#55cc55', '#ff9944'], size: 5 },
+    dust:     { colors: ['#6b5a80', '#4a3a5e'], size: 4 },
+    jump:     { colors: [PALETTE.accent], size: 3 },
+    death:    { colors: [PALETTE.accent, '#ff5e5e', '#ffd166'], size: 6 },
+    collect:  { colors: ['#7ee787', PALETTE.score], size: 4 },
+    trail:    { colors: [PALETTE.accent], size: 3 },
+    confetti: { colors: [PALETTE.accent, PALETTE.score, '#7ee787', '#5eb0ff'], size: 5 },
   },
 
   scoring: {
@@ -435,19 +238,13 @@ const THEME = {
     comboMultiplierMax: 5,
   },
 
+  // Only the speed ramp is left here. How often obstacles arrive is a property
+  // of the patterns and the scheduler, not a number to tune.
   difficulty: {
-    startSpeed: 3,
+    startSpeed: 4,
     maxSpeed: 11,
-    speedRampPerSecond: 0.025,
-    startSpawnInterval: 2000,
-    minSpawnInterval: 650,
-    spawnRampPerSecond: -5,
+    speedRampPerSecond: 0.05,
   },
 
-  sounds: {
-    jumpFreqs: [180, 440],
-    collectFreqs: [440, 554, 659],
-    hitFreq: 65,
-    bgBPM: 100,
-  },
+  sounds: Sound.chiptune(),
 };
