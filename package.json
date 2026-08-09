@@ -1,0 +1,12 @@
+{
+  "name": "bored",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Block library and test suite for the /bored endless runner plugin",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
